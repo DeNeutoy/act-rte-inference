@@ -125,7 +125,7 @@ def main(unused_args):
                 if weights_dir is not None:
                     date = "{:%m.%d.%H.%M}".format(datetime.now())
                     saveload.main(weights_dir + "/Epoch_{:02}Train_{:0.3f}Val_{:0.3f}date{}.pkl"
-                                  .format(i+1,train_loss,valid_loss, date), session)
+                                  .format(i+1,train_acc,valid_acc, date), session)
 
 
             test_loss, test_acc = run_epoch(session, m_test, test_buckets, training=False)
