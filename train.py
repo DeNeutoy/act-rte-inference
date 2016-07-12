@@ -74,7 +74,7 @@ def main(unused_args):
     if debug:
         buckets = [(15,10)]
         raw_data = snli_reader.load_data(args.data_path,train, val, test, vocab, False,
-                            max_records=60,buckets=buckets, batch_size=config.batch_size)
+                            max_records=600,buckets=buckets, batch_size=config.batch_size)
     else:
         buckets = [(10,5),(20,10),(30,20), (62,82)]
         raw_data = snli_reader.load_data(args.data_path,train, val, test, vocab, False,
@@ -140,9 +140,9 @@ def main(unused_args):
             for i in range(config.max_max_epoch):
                 #lr_decay = config.lr_decay ** max(i - config.max_epoch, 0.0)
                 #session.run(tf.assign(m[model].lr, config.learning_rate * lr_decay))
-                print("Epoch {}, Training data")
+                print("Epoch {}, Training data".format(i + 1))
                 train_loss, train_acc = run_epoch(session, models, train_buckets,training=True, verbose=True)
-                print ("Epoch {}, Validation data")
+                print ("Epoch {}, Validation data".format(i + 1))
                 valid_loss, valid_acc = run_epoch(session, models_val, val_buckets,training=False)
 
                 print("Epoch: {} Train Loss: {} Train Acc: {}".format(i + 1, train_loss, train_acc))
