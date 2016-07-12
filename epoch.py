@@ -28,6 +28,9 @@ def run_epoch(session, models, data, training, verbose=False):
     for step, (id,(x, y)) in enumerate(id_to_data):
 
         m = models[id]
+        assert x["premise"].shape == (m.premise.get_shape())
+        assert x["hypothesis"].shape == (m.hypothesis.get_shape())
+
         if training:
             eval_op = m.train_op
         else:
@@ -38,7 +41,6 @@ def run_epoch(session, models, data, training, verbose=False):
         costs += cost
         iters += 1
         accuracy += batch_acc
-
         #if verbose and step % (epoch_size // 10) == 10:
         print("%.3f acc: %.3f loss: %.3f speed: %.0f examples/s" %
               (step * 1.0 / epoch_size,

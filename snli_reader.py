@@ -8,8 +8,10 @@ from Vocab import Vocab
 from nltk.tokenize import word_tokenize
 from collections import defaultdict
 from random import shuffle
-def get_sentences(data):
 
+
+def get_sentences(data):
+    # tokenise using nltk tokeniser
     str1 = data["sentence1"]
     str2 = data["sentence2"]
 
@@ -31,22 +33,23 @@ def categorical_label(data):
         onehot = [0,0,0]
         onehot[category] = 1
         return onehot
+
     except ValueError:
         return None
 
 
-def load_data(data_path,train, dev, test, vocab,
-              update_vocab, max_records, buckets, max_len, batch_size):
+def load_data(data_path,train,dev,test, vocab,
+              update_vocab,buckets,max_records=None, batch_size=30):
 
     all_output = []
-    buckets.append(max_len)
+    all_stats = []
+    max_len = buckets[-1] # last bucket size is the max
     for file in [train, dev, test]:
 
-        output = [[]]*len(buckets)
+        output = [[] for _ in range(len(buckets))]
         bucket_dict =  {i:defaultdict(list) for i in range(len(buckets))}
 
         stats = Counter()
-
 
         for line in open(os.path.join(data_path,file), 'r').readlines():
             data = json.loads(line)
@@ -59,19 +62,20 @@ def load_data(data_path,train, dev, test, vocab,
             s1, s2 = get_sentences(data)
             len_s1 = len(s1)
             len_s2 = len(s2)
-            current_max_len = max(len_s1, len_s2)
-            stats["current_max_len"] = max(stats["current_max_len"], current_max_len )
+            stats["max_len_premise"] = max(stats["max_len_premise"], len_s1)
+            stats["max_len_hypothesis"] = max(stats["max_len_hypothesis"], len_s2)
+
 
             # drop item if either premise or hyp is too long
-            if len_s1 > max_len[0] or len_s2 > max_len[1]:
+            if max_len and (len_s1 > max_len[0] or len_s2 > max_len[1]):
                 stats['n_ignore_long'] += 1
                 continue
 
             # take max of sentence lengths to determine bucket that it goes in
             #buck_idx = 0 if len_s1 > len_s2 else 1
+
             id1 = np.searchsorted([x[0] for x in buckets], len_s1)
             id2 = np.searchsorted([x[1] for x in buckets], len_s2)
-
             bucket_id = max(id1,id2)
 
             s1_ids = vocab.ids_for_tokens(s1, update_vocab)
@@ -94,22 +98,22 @@ def load_data(data_path,train, dev, test, vocab,
                     .reshape(batch_size, buckets[bucket_id][0]),
                      "hypothesis": np.asarray(bucket_dict[bucket_id]["s2_batch"])
                          .reshape(batch_size, buckets[bucket_id][1])}
-
                 tar = np.asarray(bucket_dict[bucket_id]["labels"]).reshape(batch_size, 3)
 
                 output[bucket_id].append((sents,tar))
-
                 bucket_dict[bucket_id]["s1_batch"] = []
                 bucket_dict[bucket_id]["s2_batch"] = []
                 bucket_dict[bucket_id]["labels"] = []
 
             # break if the current largest bucket is greater than the max allowed
-            if max([len(x) for x in output]) == max_records:
+            if max_records and (max([len(x) for x in output]) == max_records):
                 break
 
-        all_output.append((output, stats))
+        all_output.append(output)
+        all_stats.append(stats)
 
-    return all_output
+    train_data, val_data, test_data = all_output
+    return  train_data, val_data, test_data, all_stats
 
 
 
@@ -129,24 +133,27 @@ def bucket_shuffle(dict_data):
 if __name__=="__main__":
 
 
+    # test for loader
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset_path")
 
     args = parser.parse_args()
 
-
     dataset_path = args.dataset_path
     vocab = Vocab("/Users/markneumann/Documents/Machine_Learning/act-rte-inference/snli_1.0/debug_vocab.txt", dataset_path, 30000)
 
     all_out = load_data(dataset_path,"snli_1.0_train.jsonl","snli_1.0_dev.jsonl","snli_1.0_test.jsonl",
-                            vocab, False,max_records=100, buckets=[(10,10),(15,20)], max_len=(60,60), batch_size=30)
+                            vocab, False,buckets=[(10,10),(15,20)],max_records=100, max_len=(60,60), batch_size=30)
 
+    train, dev, test, stats = all_out
 
-    train, dev, test = all_out
+    train_dict = {x:v for x,v in enumerate(train)}
 
-    train_dict = {x:v for x,v in enumerate(train[0])}
-
+    buckets = [(10,10), (15,20), (60,60)]
     len, it = bucket_shuffle(train_dict)
 
-    print(it)
-    print(next(it))
+    for (id, data) in it:
+
+         assert data[0]["hypothesis"].shape == (30,buckets[id][1])
+         assert data[0]["premise"].shape == (30,buckets[id][0])
+

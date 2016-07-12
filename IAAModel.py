@@ -5,7 +5,10 @@ from tensorflow.python.ops import  rnn, rnn_cell, seq2seq
 
 class IAAModel(object):
 
-    def __init__(self, config, is_training=False):
+    """ Implements Iterative Alternating Attention for Machine Reading
+        http://arxiv.org/pdf/1606.02245v3.pdf """
+
+    def __init__(self, config, pretrained_embeddings=None, is_training=False):
 
         self.config = config
         self.batch_size = batch_size = config.batch_size
@@ -16,11 +19,23 @@ class IAAModel(object):
         self.hyp_steps = config.hyp_steps
         # placeholders for inputs
         self.premise = tf.placeholder(tf.int32, [batch_size, self.prem_steps])
-        self.hypothesis = tf.placeholder(tf.int32, [batch_size, self.prem_steps])
+        self.hypothesis = tf.placeholder(tf.int32, [batch_size, self.hyp_steps])
         self.targets = tf.placeholder(tf.int32, [batch_size, 3])
 
+        if pretrained_embeddings is not None:
 
-        embedding = tf.get_variable('embedding', [self.vocab_size, self.hidden_size], dtype=tf.float32)
+            embeddings_dim = pretrained_embeddings.shape[1]
+            self.initial_embedding = tf.get_variable("inital_embedding",
+                                    initializer=tf.constant_initializer(pretrained_embeddings),
+                                    shape=[self.vocab_size, embeddings_dim],dtype=tf.float32,
+                                     trainable=False)
+            projection = tf.tanh(rnn_cell._linear(self.initial_embedding, self.hidden_size, True))
+            embedding = tf.get_variable("embedding", [self.vocab_size, self.hidden_size], dtype=tf.float32,
+                                        trainable=False)
+            embedding.assign(projection)
+
+        else:
+            embedding = tf.get_variable('embedding', [self.vocab_size, self.hidden_size], dtype=tf.float32)
 
 
         # create lists of (batch,hidden_size) inputs for models
@@ -36,7 +51,7 @@ class IAAModel(object):
             self.premise_cell = rnn_cell.MultiRNNCell([encoder]* self.num_layers)
 
 
-        # run premise GRU over the sentence
+        # run GRUs over premise + hypothesis
         premise_outputs, premise_state = rnn.rnn(self.premise_cell, premise_inputs,dtype=tf.float32, scope="gru_premise")
         premise_outputs = tf.concat(1, [tf.expand_dims(x,1) for x in premise_outputs])
 
@@ -58,8 +73,6 @@ class IAAModel(object):
         with tf.variable_scope("prediction"):
             prediction = self.do_inference_steps(self.inference_cell,self.inference_state,
                                              premise_outputs, hyp_outputs, 3)
-
-
 
         # softmax over outputs to generate distribution over [neutral, entailment, contradiction]
 
@@ -99,11 +112,11 @@ class IAAModel(object):
         attn_size = attendees.get_shape()[2].value
 
         with tf.variable_scope(scope):
+
             hidden = tf.reshape(attendees, [-1, attn_length, 1, attn_size])
             k = tf.get_variable("attention_W", [1,1,attn_size,attn_size])
 
             features = tf.nn.conv2d(hidden, k, [1, 1, 1, 1], "SAME")
-
             v = tf.get_variable("attention_v", [attn_size])
 
             with tf.variable_scope("attention"):
@@ -134,6 +147,8 @@ class IAAModel(object):
 
             prem_attn = self.attention(state_for_premise, premise, "prem_attn")
 
+            # feature representation to generate the "gate" to determine
+            # how much of the inference we should carry through the cell
             state_for_gates = tf.concat(1, [state, hyp_attn ,prem_attn, prem_attn * hyp_attn])
 
             hyp_gate = self.gate_mechanism(state_for_gates, "hyp_gate")
