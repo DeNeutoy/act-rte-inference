@@ -3,7 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 
-class SmallConfig(object):
+class BaseConfig(object):
   """Small config."""
   init_scale = 0.1
   learning_rate = 1.0
@@ -18,37 +18,28 @@ class SmallConfig(object):
   batch_size = 20
   vocab_size = 10000
 
+class IAAConfig(object):
 
-class MediumConfig(object):
-  """Medium config."""
   init_scale = 0.05
-  learning_rate = 1.0
+  learning_rate = 0.001
   max_grad_norm = 5
   num_layers = 2
-  num_steps = 35
-  hidden_size = 650
-  max_epoch = 6
-  max_max_epoch = 39
-  keep_prob = 0.5
+  num_steps = 20
+  encoder_size = 128
+  inference_size = 512
+  embedding_size = 384
+  max_epoch = 4
+  max_max_epoch = 13
+  keep_prob = 0.2
   lr_decay = 0.8
-  batch_size = 20
+  batch_size = 32
   vocab_size = 10000
+  embedding_reg = 0.0001
 
 
-class LargeConfig(object):
-  """Large config."""
-  init_scale = 0.04
-  learning_rate = 1.0
-  max_grad_norm = 10
-  num_layers = 2
-  num_steps = 35
-  hidden_size = 1500
-  max_epoch = 14
-  max_max_epoch = 55
-  keep_prob = 0.35
-  lr_decay = 1 / 1.15
-  batch_size = 20
-  vocab_size = 10000
+
+
+
 
 
   """Debugging code for models"""

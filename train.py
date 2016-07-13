@@ -74,9 +74,9 @@ def main(unused_args):
     if debug:
         buckets = [(15,10)]
         raw_data = snli_reader.load_data(args.data_path,train, val, test, vocab, False,
-                            max_records=600,buckets=buckets, batch_size=config.batch_size)
+                            max_records=1000,buckets=buckets, batch_size=config.batch_size)
     else:
-        buckets = [(10,5),(20,10),(30,20), (62,82)]
+        buckets = [(10,5),(20,10),(30,20),(40,30),(50,40),(82,62)]
         raw_data = snli_reader.load_data(args.data_path,train, val, test, vocab, False,
                             max_records=None, buckets=buckets, batch_size=config.batch_size)
 
@@ -92,11 +92,10 @@ def main(unused_args):
     val_buckets = {x:v for x,v in enumerate(val_data)}
     test_buckets = {x:v for x,v in enumerate(test_data)}
 
-
     if embeddings is not None:
         print("loading embeddings from {}".format(embeddings))
         vocab_dict = import_embeddings(embeddings)
-        embedding_var = np.random.normal(0.0, config.init_scale, [config.vocab_size, 50])
+        embedding_var = np.random.normal(0.0, config.init_scale, [config.vocab_size, 300])
         no_embeddings = 0
         for word in vocab.token_id.keys():
             try:
@@ -169,7 +168,7 @@ if __name__ == '__main__':
     parser.add_argument("--model_path")
     parser.add_argument("--weights_dir")
     parser.add_argument("--verbose")
-    parser.add_argument("--debug")
+    parser.add_argument("--debug", action='store_true', default=False)
     parser.add_argument("--vocab_path")
     parser.add_argument("--embedding_path")
 

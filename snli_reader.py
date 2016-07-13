@@ -51,63 +51,66 @@ def load_data(data_path,train,dev,test, vocab,
 
         stats = Counter()
 
-        for line in open(os.path.join(data_path,file), 'r').readlines():
-            data = json.loads(line)
+        with open(os.path.join(data_path,file), "r") as dataset:
 
-            label = categorical_label(data)
-            if label is None:
-                stats['bad_label'] += 1
-                continue
+            for line in dataset:
+                data = json.loads(line)
 
-            s1, s2 = get_sentences(data)
-            len_s1 = len(s1)
-            len_s2 = len(s2)
-            stats["max_len_premise"] = max(stats["max_len_premise"], len_s1)
-            stats["max_len_hypothesis"] = max(stats["max_len_hypothesis"], len_s2)
+                label = categorical_label(data)
+                if label is None:
+                    stats['bad_label'] += 1
+                    continue
 
-
-            # drop item if either premise or hyp is too long
-            if max_len and (len_s1 > max_len[0] or len_s2 > max_len[1]):
-                stats['n_ignore_long'] += 1
-                continue
-
-            # take max of sentence lengths to determine bucket that it goes in
-            #buck_idx = 0 if len_s1 > len_s2 else 1
-
-            id1 = np.searchsorted([x[0] for x in buckets], len_s1)
-            id2 = np.searchsorted([x[1] for x in buckets], len_s2)
-            bucket_id = max(id1,id2)
-
-            s1_ids = vocab.ids_for_tokens(s1, update_vocab)
-            s2_ids = vocab.ids_for_tokens(s2, update_vocab)
-
-            # pad using the bucket length tuples for premise and hypothesis
-            s1_f = pad_sentence(s1_ids, pad_length=buckets[bucket_id][0], pad_id=vocab.PAD_ID)
-            s2_f = pad_sentence(s2_ids, pad_length=buckets[bucket_id][1], pad_id=vocab.PAD_ID)
+                s1, s2 = get_sentences(data)
+                len_s1 = len(s1)
+                len_s2 = len(s2)
+                stats["max_len_premise"] = max(stats["max_len_premise"], len_s1)
+                stats["max_len_hypothesis"] = max(stats["max_len_hypothesis"], len_s2)
 
 
-            bucket_dict[bucket_id]["s1_batch"].append(s1_f)
-            bucket_dict[bucket_id]["s2_batch"].append(s2_f)
-            bucket_dict[bucket_id]["labels"].append(label)
+                # drop item if either premise or hyp is too long
+                if max_len and (len_s1 > max_len[0] or len_s2 > max_len[1]):
+                    stats['n_ignore_long'] += 1
+                    continue
 
-            # flush batch
-            if len(bucket_dict[bucket_id]["s1_batch"]) == batch_size:
+                stats["num_examples"] += 1
+                # take max of sentence lengths to determine bucket that it goes in
+                #buck_idx = 0 if len_s1 > len_s2 else 1
+
+                id1 = np.searchsorted([x[0] for x in buckets], len_s1)
+                id2 = np.searchsorted([x[1] for x in buckets], len_s2)
+                bucket_id = max(id1,id2)
+
+                s1_ids = vocab.ids_for_tokens(s1, update_vocab)
+                s2_ids = vocab.ids_for_tokens(s2, update_vocab)
+
+                # pad using the bucket length tuples for premise and hypothesis
+                s1_f = pad_sentence(s1_ids, pad_length=buckets[bucket_id][0], pad_id=vocab.PAD_ID)
+                s2_f = pad_sentence(s2_ids, pad_length=buckets[bucket_id][1], pad_id=vocab.PAD_ID)
 
 
-                sents = {"premise": np.asarray(bucket_dict[bucket_id]["s1_batch"])
-                    .reshape(batch_size, buckets[bucket_id][0]),
-                     "hypothesis": np.asarray(bucket_dict[bucket_id]["s2_batch"])
-                         .reshape(batch_size, buckets[bucket_id][1])}
-                tar = np.asarray(bucket_dict[bucket_id]["labels"]).reshape(batch_size, 3)
+                bucket_dict[bucket_id]["s1_batch"].append(s1_f)
+                bucket_dict[bucket_id]["s2_batch"].append(s2_f)
+                bucket_dict[bucket_id]["labels"].append(label)
 
-                output[bucket_id].append((sents,tar))
-                bucket_dict[bucket_id]["s1_batch"] = []
-                bucket_dict[bucket_id]["s2_batch"] = []
-                bucket_dict[bucket_id]["labels"] = []
+                # flush batch
+                if len(bucket_dict[bucket_id]["s1_batch"]) == batch_size:
 
-            # break if the current largest bucket is greater than the max allowed
-            if max_records and (max([len(x) for x in output]) == max_records):
-                break
+
+                    sents = {"premise": np.asarray(bucket_dict[bucket_id]["s1_batch"])
+                        .reshape(batch_size, buckets[bucket_id][0]),
+                         "hypothesis": np.asarray(bucket_dict[bucket_id]["s2_batch"])
+                             .reshape(batch_size, buckets[bucket_id][1])}
+                    tar = np.asarray(bucket_dict[bucket_id]["labels"]).reshape(batch_size, 3)
+
+                    output[bucket_id].append((sents,tar))
+                    bucket_dict[bucket_id]["s1_batch"] = []
+                    bucket_dict[bucket_id]["s2_batch"] = []
+                    bucket_dict[bucket_id]["labels"] = []
+
+                # break if the current largest bucket is greater than the max allowed
+                if max_records and (max([len(x) for x in output]) == max_records):
+                    break
 
         all_output.append(output)
         all_stats.append(stats)
