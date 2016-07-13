@@ -93,9 +93,11 @@ def main(unused_args):
     test_buckets = {x:v for x,v in enumerate(test_data)}
 
     if embeddings is not None:
+        #### TODO: embedding size must currently equal config.hidden dim. ++Projection wrapper.
         print("loading embeddings from {}".format(embeddings))
         vocab_dict = import_embeddings(embeddings)
-        embedding_var = np.random.normal(0.0, config.init_scale, [config.vocab_size, 300])
+        config.hidden_size = len(vocab_dict["the"])
+        embedding_var = np.random.normal(0.0, config.init_scale, [config.vocab_size, config.hidden_size])
         no_embeddings = 0
         for word in vocab.token_id.keys():
             try:
@@ -135,6 +137,7 @@ def main(unused_args):
 
                 tf.initialize_all_variables().run()
 
+
             print("beginning training")
             for i in range(config.max_max_epoch):
                 #lr_decay = config.lr_decay ** max(i - config.max_epoch, 0.0)
@@ -155,6 +158,10 @@ def main(unused_args):
 
 
             test_loss, test_acc = run_epoch(session, models_test, test_buckets, training=False)
+            date = "{:%m.%d.%H.%M}".format(datetime.now())
+
+            saveload.main(weights_dir + "/FinalTestAcc_{:0.5f}date{}.pkl"
+                                  .format(test_acc, date), session)
             if verbose:
                 print("Test Accuracy: {}".format(test_acc))
 

@@ -8,7 +8,7 @@ class IAAModel(object):
     """ Implements Iterative Alternating Attention for Machine Reading
         http://arxiv.org/pdf/1606.02245v3.pdf """
 
-    def __init__(self, config, pretrained_embeddings=None, is_training=False):
+    def __init__(self, config, pretrained_embeddings=None,update_embeddings=True, is_training=False):
 
         self.config = config
         self.batch_size = batch_size = config.batch_size
@@ -22,18 +22,10 @@ class IAAModel(object):
         self.hypothesis = tf.placeholder(tf.int32, [batch_size, self.hyp_steps])
         self.targets = tf.placeholder(tf.int32, [batch_size, 3])
 
+
         if pretrained_embeddings is not None:
-
-            embeddings_dim = pretrained_embeddings.shape[1]
-            self.initial_embedding = tf.get_variable("inital_embedding",
-                                    initializer=tf.constant_initializer(pretrained_embeddings),
-                                    shape=[self.vocab_size, embeddings_dim],dtype=tf.float32,
-                                     trainable=False)
-            projection = tf.tanh(rnn_cell._linear(self.initial_embedding, self.hidden_size, True))
-            embedding = tf.get_variable("embedding", [self.vocab_size, self.hidden_size], dtype=tf.float32,
-                                        trainable=False)
-            embedding.assign(projection)
-
+            embedding = tf.get_variable('embedding', [self.vocab_size, self.hidden_size], dtype=tf.float32,
+                                        initializer=tf.constant_initializer(pretrained_embeddings), trainable=update_embeddings)
         else:
             embedding = tf.get_variable('embedding', [self.vocab_size, self.hidden_size], dtype=tf.float32)
 
