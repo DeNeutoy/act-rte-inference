@@ -24,11 +24,11 @@ class IAAModel(object):
 
 
         if pretrained_embeddings is not None:
-            embedding = tf.get_variable('embedding', [self.vocab_size, self.config.embedding_size], dtype=tf.float32,
+            embedding = tf.get_variable('embedding', [self.vocab_size, self.hidden_size], dtype=tf.float32,
                                         initializer=tf.constant_initializer(pretrained_embeddings),
                                         trainable=update_embeddings)
         else:
-            embedding = tf.get_variable('embedding', [self.vocab_size, self.config.embedding_size], dtype=tf.float32)
+            embedding = tf.get_variable('embedding', [self.vocab_size, self.hidden_size], dtype=tf.float32)
 
 
         # create lists of (batch,hidden_size) inputs for models

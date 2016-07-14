@@ -27,7 +27,7 @@ class IAAConfig(object):
   num_steps = 20
   encoder_size = 128
   inference_size = 512
-  embedding_size = 384
+  hidden_size = 384
   max_epoch = 4
   max_max_epoch = 13
   keep_prob = 0.8
@@ -43,7 +43,7 @@ class DAConfig(object):
   max_grad_norm = 5
   num_layers = 2
   num_steps = 20
-  embedding_size = 300
+  hidden_size = 300
   max_epoch = 4
   max_max_epoch = 13
   keep_prob = 0.8

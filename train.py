@@ -57,7 +57,7 @@ def main(unused_args):
     if debug:
         buckets = [(15,10)]
         raw_data = snli_reader.load_data(args.data_path,train, val, test, vocab, False,
-                            max_records=1000,buckets=buckets, batch_size=config.batch_size)
+                            max_records=10,buckets=buckets, batch_size=config.batch_size)
     else:
         buckets = [(10,5),(20,10),(30,20),(40,30),(50,40),(82,62)]
         raw_data = snli_reader.load_data(args.data_path,train, val, test, vocab, False,
@@ -76,11 +76,13 @@ def main(unused_args):
     test_buckets = {x:v for x,v in enumerate(test_data)}
 
     if embeddings is not None:
-        #### TODO: embedding size must currently equal config.hidden dim. ++Projection wrapper.
         print("loading embeddings from {}".format(embeddings))
         vocab_dict = import_embeddings(embeddings)
+
+        #### TODO: embedding size must currently equal config.hidden dim. need projection wrapper.
         config.hidden_size = len(vocab_dict["the"])
         eval_config.hidden_size = config.hidden_size
+
         embedding_var = np.random.normal(0.0, config.init_scale, [config.vocab_size, config.hidden_size])
         no_embeddings = 0
         for word in vocab.token_id.keys():
