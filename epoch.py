@@ -23,6 +23,7 @@ def run_epoch(session, models, data, training, verbose=False):
     costs = 0.0
     iters = 0
     accuracy = 0.0
+    first_acc = 0.0
     epoch_size, id_to_data = bucket_shuffle(data)
 
     for step, (id,(x, y)) in enumerate(id_to_data):
@@ -38,6 +39,12 @@ def run_epoch(session, models, data, training, verbose=False):
         batch_acc, cost, _ = session.run([m.accuracy, m.cost, eval_op], feed_dict={m.premise: x["premise"],
                                       m.hypothesis: x["hypothesis"],
                                       m.targets: y})
+
+        # if step == 0:
+        #     first_acc = batch_acc
+        # if (step == epoch_size // 2) and (batch_acc <= first_acc) and training:
+        #     session.run(tf.assign(m.lr, m.config.learning_rate * m.config.lr_decay))
+
         costs += cost
         iters += 1
         accuracy += batch_acc

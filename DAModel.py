@@ -29,13 +29,13 @@ class DAModel(object):
             embedding = tf.get_variable('embedding', [self.vocab_size, self.hidden_size], dtype=tf.float32)
 
 
-        # create lists of (batch,hidden_size) inputs for models
+        # create lists of (batch,step,hidden_size) inputs for models
         premise_inputs = tf.nn.embedding_lookup(embedding, self.premise)
         hypothesis_inputs = tf.nn.embedding_lookup(embedding, self.hypothesis)
 
         # run FF networks over inputs
-        prem_attn = self.attention(premise_inputs, "premise_attention")
-        hyp_attn = self.attention(hypothesis_inputs, "hypothesis_attention")
+        prem_attn = self.feed_forward_attention(premise_inputs, "premise_attention")
+        hyp_attn = self.feed_forward_attention(hypothesis_inputs, "hypothesis_attention")
 
         # get activations, shape: (batch, prem_steps, hyp_steps )
         dot = tf.batch_matmul(prem_attn, hyp_attn, adj_y=True)
@@ -59,10 +59,10 @@ class DAModel(object):
         betas = [tf.squeeze(x) for x in
                  tf.split(1, self.prem_steps,tf.reshape(betas, [batch_size, -1 , self.hidden_size]))]
 
-        # list of premise vecs to go with betas
+        # list of original premise vecs to go with betas
         prem_list = [tf.squeeze(single_input, [1]) for single_input in tf.split(1, self.prem_steps, premise_inputs)]
 
-        # list of hypothesis vecs to go with alphas
+        # list of original hypothesis vecs to go with alphas
         hyp_list = [tf.squeeze(single_input, [1]) for single_input in tf.split(1, self.hyp_steps, hypothesis_inputs)]
 
         beta_concat_prems = []
@@ -90,7 +90,6 @@ class DAModel(object):
             final_representation = self.feedforward_network(tf.concat(1, [sum_prem_vec, sum_hyp_vec]))
 
         # softmax over outputs to generate distribution over [neutral, entailment, contradiction]
-
         softmax_w = tf.get_variable("softmax_w", [4*hidden_size, 3])
         softmax_b = tf.get_variable("softmax_b", [3])
         self.logits = tf.matmul(final_representation, softmax_w) + softmax_b   # dim (batch_size, 3)
@@ -111,18 +110,17 @@ class DAModel(object):
 
         if is_training:
 
-            self.lr = tf.Variable(0.0, trainable=False)
+            self.lr = tf.Variable(self.config.learning_rate, trainable=False)
 
             tvars = tf.trainable_variables()
             grads, _ = tf.clip_by_global_norm(tf.gradients(self.cost, tvars), self.config.max_grad_norm)
 
             #optimizer = tf.train.GradientDescentOptimizer(self.lr)
-            optimizer = tf.train.AdamOptimizer(self.config.learning_rate)
+            optimizer = tf.train.AdamOptimizer(self.lr)
             self.train_op = optimizer.apply_gradients(zip(grads, tvars))
 
-    def attention(self, attendees, scope):
-        """Put attention masks on hidden using hidden_features and query."""
-        # TODO no bias, is this a problem?
+    def feed_forward_attention(self, attendees, scope):
+        "Sends 3D tensor through two 2D convolutions with 2 different features"
 
         attn_length = attendees.get_shape()[1].value
         attn_size = attendees.get_shape()[2].value
@@ -130,11 +128,17 @@ class DAModel(object):
         with tf.variable_scope(scope):
 
             hidden = tf.reshape(attendees, [-1, attn_length, 1, attn_size])
-            k1 = tf.get_variable("attention_W", [1,1,attn_size,attn_size])
-            k2 = tf.get_variable("attention_W2", [1,1,attn_size,attn_size])
+            k1 = tf.get_variable("W1", [1,1,attn_size,attn_size])
+            k2 = tf.get_variable("W2", [1,1,attn_size,attn_size])
+            b1 = tf.get_variable("b1", [attn_size])
+            b2 = tf.get_variable("b2", [attn_size])
 
-            features = tf.nn.relu(tf.nn.conv2d(hidden, k1, [1, 1, 1, 1], "SAME"))
-            features = tf.nn.relu(tf.nn.conv2d(features, k2, [1,1,1,1], "SAME"))
+            if self.config.keep_prob:
+                k1 = tf.nn.dropout(k1, self.config.keep_prob)
+                k2 = tf.nn.dropout(k2, self.config.keep_prob)
+
+            features = tf.nn.relu(tf.nn.bias_add(tf.nn.conv2d(hidden, k1, [1, 1, 1, 1], "SAME"),b1))
+            features = tf.nn.relu(tf.nn.bias_add(tf.nn.conv2d(features, k2, [1,1,1,1], "SAME"), b2))
 
         return tf.squeeze(features)
 
@@ -149,6 +153,10 @@ class DAModel(object):
 
         hidden2_w = tf.get_variable("hidden2_w", [hidden_dim, hidden_dim])
         hidden2_b = tf.get_variable("hidden2_b", [hidden_dim])
+
+        if self.config.keep_prob:
+            hidden1_w = tf.nn.dropout(hidden1_w, self.config.keep_prob)
+            hidden2_w = tf.nn.dropout(hidden2_w, self.config.keep_prob)
 
         hidden1 = tf.nn.relu(tf.matmul(input, hidden1_w) + hidden1_b)
         gate_output = tf.nn.relu(tf.matmul(hidden1, hidden2_w) + hidden2_b)

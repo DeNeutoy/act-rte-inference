@@ -24,10 +24,11 @@ class IAAModel(object):
 
 
         if pretrained_embeddings is not None:
-            embedding = tf.get_variable('embedding', [self.vocab_size, self.hidden_size], dtype=tf.float32,
-                                        initializer=tf.constant_initializer(pretrained_embeddings), trainable=update_embeddings)
+            embedding = tf.get_variable('embedding', [self.vocab_size, self.config.embedding_size], dtype=tf.float32,
+                                        initializer=tf.constant_initializer(pretrained_embeddings),
+                                        trainable=update_embeddings)
         else:
-            embedding = tf.get_variable('embedding', [self.vocab_size, self.hidden_size], dtype=tf.float32)
+            embedding = tf.get_variable('embedding', [self.vocab_size, self.config.embedding_size], dtype=tf.float32)
 
 
         # create lists of (batch,hidden_size) inputs for models
@@ -38,18 +39,18 @@ class IAAModel(object):
         hypothesis_inputs = [tf.squeeze(single_input, [1]) for single_input in tf.split(1, self.hyp_steps, hypothesis_inputs)]
 
 
-        with tf.variable_scope("gru_premise"):
-            encoder = rnn_cell.GRUCell(self.config.hidden_size)
-            self.premise_cell = rnn_cell.MultiRNNCell([encoder]* self.num_layers)
 
+        with tf.variable_scope("gru_premise"):
+            encoder = rnn_cell.GRUCell(self.config.encoder_size)
+            self.premise_cell = rnn_cell.MultiRNNCell([encoder]* self.num_layers)
 
         # run GRUs over premise + hypothesis
         premise_outputs, premise_state = rnn.rnn(self.premise_cell, premise_inputs,dtype=tf.float32, scope="gru_premise")
         premise_outputs = tf.concat(1, [tf.expand_dims(x,1) for x in premise_outputs])
 
         with tf.variable_scope("gru_hypothesis"):
-            decoder = rnn_cell.GRUCell(self.config.hidden_size)
-            self.hyp_cell = rnn_cell.MultiRNNCell([decoder]* self.num_layers)
+            decoder = rnn_cell.GRUCell(self.config.encoder_size)
+            self.hyp_cell = rnn_cell.MultiRNNCell([decoder] * self.num_layers)
 
         hyp_outputs, hyp_state = rnn.rnn(self.hyp_cell,hypothesis_inputs,premise_state,tf.float32, scope= "gru_hypothesis")
         hyp_outputs = tf.concat(1, [tf.expand_dims(x,1) for x in hyp_outputs])
@@ -57,7 +58,7 @@ class IAAModel(object):
 
         with tf.variable_scope("gru_inference"):
 
-            inference = rnn_cell.GRUCell(self.config.hidden_size)
+            inference = rnn_cell.GRUCell(self.config.inference_size)
             self.inference_cell = rnn_cell.MultiRNNCell([inference]*self.num_layers)
             self.inference_state = self.inference_cell.zero_state(self.batch_size, tf.float32)
 
@@ -68,7 +69,7 @@ class IAAModel(object):
 
         # softmax over outputs to generate distribution over [neutral, entailment, contradiction]
 
-        softmax_w = tf.get_variable("softmax_w", [hidden_size, 3])
+        softmax_w = tf.get_variable("softmax_w", [self.config.inference_size, 3])
         softmax_b = tf.get_variable("softmax_b", [3])
         self.logits = tf.matmul(prediction, softmax_w) + softmax_b   # dim (batch_size, 3)
 
@@ -81,20 +82,22 @@ class IAAModel(object):
                 3)
         self.cost = tf.reduce_mean(loss)
 
+        if self.config.embedding_reg and update_embeddings:
+            self.cost += self.config.embedding_reg * (tf.reduce_mean(tf.square(embedding)))
+
         _, logit_max_index = tf.nn.top_k(self.logits)
 
         self.accuracy = tf.reduce_mean(tf.cast(tf.equal(logit_max_index, targets), tf.float32))
 
-
         if is_training:
 
-            self.lr = tf.Variable(0.0, trainable=False)
+            self.lr = tf.Variable(config.learning_rate, trainable=False)
 
             tvars = tf.trainable_variables()
             grads, _ = tf.clip_by_global_norm(tf.gradients(self.cost, tvars), self.config.max_grad_norm)
 
             #optimizer = tf.train.GradientDescentOptimizer(self.lr)
-            optimizer = tf.train.AdamOptimizer(self.config.learning_rate)
+            optimizer = tf.train.AdamOptimizer(self.lr)
             self.train_op = optimizer.apply_gradients(zip(grads, tvars))
 
     def attention(self, query, attendees, scope):
@@ -133,6 +136,10 @@ class IAAModel(object):
 
             if i > 0: tf.get_variable_scope().reuse_variables()
 
+            if self.config.keep_prob:
+                premise = tf.nn.dropout(premise, self.config.keep_prob)
+                hypothesis = tf.nn.dropout(hypothesis,self.config.keep_prob)
+
             hyp_attn = self.attention(state, hypothesis, "hyp_attn")
 
             state_for_premise = tf.concat(1, [state, hyp_attn])
@@ -157,14 +164,20 @@ class IAAModel(object):
     def gate_mechanism(self, gate_input, scope):
 
         with tf.variable_scope(scope):
-            hidden1_w = tf.get_variable("hidden1_w", [4*self.hidden_size, 4*self.hidden_size])
-            hidden1_b = tf.get_variable("hidden1_b", [4*self.hidden_size])
 
-            hidden2_w = tf.get_variable("hidden2_w", [4*self.hidden_size, 2*self.hidden_size])
-            hidden2_b = tf.get_variable("hidden2_b", [2*self.hidden_size])
+            size = 3*self.config.encoder_size + self.config.inference_size
+            hidden1_w = tf.get_variable("hidden1_w", [size, size])
+            hidden1_b = tf.get_variable("hidden1_b", [size])
 
-            sigmoid_w = tf.get_variable("sigmoid_w", [2*self.hidden_size, self.hidden_size])
-            sigmoid_b = tf.get_variable("sigmoid_b", [self.batch_size, self.hidden_size])
+            hidden2_w = tf.get_variable("hidden2_w", [size, size])
+            hidden2_b = tf.get_variable("hidden2_b", [size])
+
+            sigmoid_w = tf.get_variable("sigmoid_w", [size, self.config.encoder_size])
+            sigmoid_b = tf.get_variable("sigmoid_b", [self.batch_size, self.config.encoder_size])
+
+            if self.config.keep_prob:
+                hidden1_w = tf.nn.dropout(hidden1_w, self.config.keep_prob)
+                hidden2_w = tf.nn.dropout(hidden2_w, self.config.keep_prob)
 
             hidden1 = tf.nn.relu(tf.matmul(gate_input, hidden1_w) + hidden1_b)
             hidden2 = tf.nn.relu(tf.matmul(hidden1, hidden2_w) + hidden2_b)

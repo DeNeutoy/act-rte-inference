@@ -6,17 +6,17 @@ from __future__ import print_function
 class BaseConfig(object):
   """Small config."""
   init_scale = 0.1
-  learning_rate = 1.0
+  learning_rate = 0.001
   max_grad_norm = 5     # changed from 5
   num_layers = 2
-  num_steps = 20
   hidden_size = 200 # should be 200
   max_epoch = 4
   max_max_epoch = 13
-  keep_prob = 1.0
+  keep_prob = 0.8
   lr_decay = 0.5
   batch_size = 20
   vocab_size = 10000
+  embedding_reg = None
 
 class IAAConfig(object):
 
@@ -30,14 +30,27 @@ class IAAConfig(object):
   embedding_size = 384
   max_epoch = 4
   max_max_epoch = 13
-  keep_prob = 0.2
+  keep_prob = 0.8
   lr_decay = 0.8
   batch_size = 32
   vocab_size = 10000
   embedding_reg = 0.0001
 
+class DAConfig(object):
 
-
+  init_scale = 0.05
+  learning_rate = 0.001
+  max_grad_norm = 5
+  num_layers = 2
+  num_steps = 20
+  embedding_size = 300
+  max_epoch = 4
+  max_max_epoch = 13
+  keep_prob = 0.8
+  lr_decay = 0.8
+  batch_size = 32
+  vocab_size = 10000
+  embedding_reg = None
 
 
 

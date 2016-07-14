@@ -5,7 +5,7 @@ from __future__ import print_function
 import os
 import pickle
 from datetime import datetime
-import ACTconfig as cf
+import config as CONFIG
 import snli_reader
 import tensorflow as tf
 from epoch import run_epoch
@@ -17,41 +17,24 @@ import saveload
 import argparse
 import numpy as np
 
-def get_config(conf):
+def get_config_and_model(conf):
 
-    if conf == "small":
-        return cf.SmallConfig
-    elif conf == "medium":
-        return cf.MediumConfig
-    elif conf == "large":
-        return cf.LargeConfig
-
-class SmallConfig(object):
-  """Small config."""
-  init_scale = 0.1
-  learning_rate = 0.0005
-  max_grad_norm = 5     # changed from 5
-  num_layers = 2
-  prem_steps = 20
-  hyp_steps = 20
-  hidden_size = 200 # should be 200
-  max_epoch = 4
-  max_max_epoch = 13
-  lr_decay = 0.5
-  batch_size = 20 #changed from 20
-  vocab_size = 10000
-
+    if conf == "DAModel":
+        return DAModel, CONFIG.DAConfig()
+    elif conf == "IAAModel":
+        return IAAModel, CONFIG.IAAConfig()
 
 def main(unused_args):
-
-    config = get_config(args.model_size)
-    eval_config = get_config(args.model_size)
     saved_model_path = args.model_path
     vocab_path = args.vocab_path
     weights_dir = args.weights_dir
     verbose = args.verbose
     debug = args.debug
     embeddings = args.embedding_path
+
+    MODEL, config = get_config_and_model(args.model)
+    _, eval_config = get_config_and_model(args.model)
+
 
 
     if weights_dir is not None:
@@ -97,6 +80,7 @@ def main(unused_args):
         print("loading embeddings from {}".format(embeddings))
         vocab_dict = import_embeddings(embeddings)
         config.hidden_size = len(vocab_dict["the"])
+        eval_config.hidden_size = config.hidden_size
         embedding_var = np.random.normal(0.0, config.init_scale, [config.vocab_size, config.hidden_size])
         no_embeddings = 0
         for word in vocab.token_id.keys():
@@ -125,20 +109,21 @@ def main(unused_args):
 
                 with tf.variable_scope('model', reuse= True if i > 0 else None, initializer=initialiser):
 
-                    models.append(DAModel(config, pretrained_embeddings=embedding_var, is_training=True))
+                    models.append(MODEL(config, pretrained_embeddings=embedding_var, is_training=True))
 
                     #### Reload Model ####
                     if saved_model_path is not None:
                         saveload.main(saved_model_path, session)
 
                 with tf.variable_scope('model', reuse=True):
-                    models_val.append(DAModel(config, pretrained_embeddings=embedding_var, is_training=False))
-                    models_test.append(DAModel(eval_config, pretrained_embeddings=embedding_var,is_training=False))
+                    models_val.append(MODEL(config, pretrained_embeddings=embedding_var, is_training=False))
+                    models_test.append(MODEL(eval_config, pretrained_embeddings=embedding_var,is_training=False))
 
                 tf.initialize_all_variables().run()
 
 
             print("beginning training")
+
             for i in range(config.max_max_epoch):
                 #lr_decay = config.lr_decay ** max(i - config.max_epoch, 0.0)
                 #session.run(tf.assign(m[model].lr, config.learning_rate * lr_decay))
@@ -170,7 +155,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--model_size")
+    parser.add_argument("--model")
     parser.add_argument("--data_path")
     parser.add_argument("--model_path")
     parser.add_argument("--weights_dir")
