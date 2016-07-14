@@ -35,6 +35,7 @@ def main(unused_args):
     MODEL, config = get_config_and_model(args.model)
     _, eval_config = get_config_and_model(args.model)
 
+    eval_config.keep_prob = 1.0 # TODO make config so this is unessesary
 
 
     if weights_dir is not None:
