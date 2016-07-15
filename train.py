@@ -16,6 +16,7 @@ from DAModel import DAModel
 import saveload
 import argparse
 import numpy as np
+from collections import defaultdict
 
 def get_config_and_model(conf):
 
@@ -35,7 +36,6 @@ def main(unused_args):
     MODEL, config = get_config_and_model(args.model)
     _, eval_config = get_config_and_model(args.model)
 
-    eval_config.keep_prob = 1.0 # TODO make config so this is unessesary
 
 
     if weights_dir is not None:
@@ -76,15 +76,14 @@ def main(unused_args):
     val_buckets = {x:v for x,v in enumerate(val_data)}
     test_buckets = {x:v for x,v in enumerate(test_data)}
 
-    if embeddings is not None:
+    if config.use_embeddings:
         print("loading embeddings from {}".format(embeddings))
         vocab_dict = import_embeddings(embeddings)
 
-        #### TODO: embedding size must currently equal config.hidden dim. need projection wrapper.
-        config.hidden_size = len(vocab_dict["the"])
-        eval_config.hidden_size = config.hidden_size
+        config.embedding_size = len(vocab_dict["the"])
+        eval_config.embedding_size = config.embedding_size
 
-        embedding_var = np.random.normal(0.0, config.init_scale, [config.vocab_size, config.hidden_size])
+        embedding_var = np.random.normal(0.0, config.init_scale, [config.vocab_size, config.embedding_size])
         no_embeddings = 0
         for word in vocab.token_id.keys():
             try:
@@ -97,6 +96,9 @@ def main(unused_args):
         embedding_var = None
 
     print("loading models into memory")
+    trainingStats = defaultdict(list)
+    trainingStats["config"].append(config)
+    trainingStats["eval_config"].append(eval_config)
     with tf.Graph().as_default(), tf.Session() as session:
         initialiser = tf.random_uniform_initializer(-config.init_scale, config.init_scale)
 
@@ -112,15 +114,18 @@ def main(unused_args):
 
                 with tf.variable_scope('model', reuse= True if i > 0 else None, initializer=initialiser):
 
-                    models.append(MODEL(config, pretrained_embeddings=embedding_var, is_training=True))
+                    models.append(MODEL(config, pretrained_embeddings=embedding_var,
+                                        update_embeddings=config.train_embeddings, is_training=True))
 
                     #### Reload Model ####
                     if saved_model_path is not None:
                         saveload.main(saved_model_path, session)
 
                 with tf.variable_scope('model', reuse=True):
-                    models_val.append(MODEL(config, pretrained_embeddings=embedding_var, is_training=False))
-                    models_test.append(MODEL(eval_config, pretrained_embeddings=embedding_var,is_training=False))
+                    models_val.append(MODEL(config, pretrained_embeddings=embedding_var,
+                                            update_embeddings=config.train_embeddings, is_training=False))
+                    models_test.append(MODEL(eval_config, pretrained_embeddings=embedding_var,
+                                             update_embeddings=config.train_embeddings, is_training=False))
 
                 tf.initialize_all_variables().run()
 
@@ -135,6 +140,12 @@ def main(unused_args):
                 print ("Epoch {}, Validation data".format(i + 1))
                 valid_loss, valid_acc = run_epoch(session, models_val, val_buckets,training=False)
 
+                trainingStats["train_loss"].append(train_loss)
+                trainingStats["train_acc"].append(train_acc)
+                trainingStats["val_loss"].append(valid_loss)
+                trainingStats["val_acc"].append(valid_acc)
+                trainingStats["epoch"].append(i)
+
                 print("Epoch: {} Train Loss: {} Train Acc: {}".format(i + 1, train_loss, train_acc))
                 print("Epoch: {} Valid Loss: {} Valid Acc: {}".format(i + 1, valid_loss, valid_acc))
 
@@ -144,12 +155,19 @@ def main(unused_args):
                     saveload.main(weights_dir + "/Epoch_{:02}Train_{:0.3f}Val_{:0.3f}date{}.pkl"
                                   .format(i+1,train_acc,valid_acc, date), session)
 
+                    pickle.dump(trainingStats,open(os.path.join(weights_dir, "stats.pkl"), "wb"))
 
             test_loss, test_acc = run_epoch(session, models_test, test_buckets, training=False)
             date = "{:%m.%d.%H.%M}".format(datetime.now())
 
+            trainingStats["test_loss"].append(test_loss)
+            trainingStats["test_acc"].append(test_acc)
+
             saveload.main(weights_dir + "/FinalTestAcc_{:0.5f}date{}.pkl"
                                   .format(test_acc, date), session)
+
+            pickle.dump(trainingStats,open(os.path.join(weights_dir, "stats.pkl"), "wb"))
+
             if verbose:
                 print("Test Accuracy: {}".format(test_acc))
 

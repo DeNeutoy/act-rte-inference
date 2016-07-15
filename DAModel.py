@@ -2,6 +2,7 @@
 
 import tensorflow as tf
 from tensorflow.python.ops import  rnn, rnn_cell, seq2seq
+from embedding_utils import input_projection3D
 
 class DAModel(object):
 
@@ -17,13 +18,14 @@ class DAModel(object):
         self.vocab_size = config.vocab_size
         self.prem_steps = config.prem_steps
         self.hyp_steps = config.hyp_steps
+        self.is_training = is_training
         # placeholders for inputs
         self.premise = tf.placeholder(tf.int32, [batch_size, self.prem_steps])
         self.hypothesis = tf.placeholder(tf.int32, [batch_size, self.hyp_steps])
         self.targets = tf.placeholder(tf.int32, [batch_size, 3])
 
         if pretrained_embeddings is not None:
-            embedding = tf.get_variable('embedding', [self.vocab_size, self.hidden_size], dtype=tf.float32,
+            embedding = tf.get_variable('embedding', [self.vocab_size, self.config.embedding_size], dtype=tf.float32,
                                         initializer=tf.constant_initializer(pretrained_embeddings), trainable=update_embeddings)
         else:
             embedding = tf.get_variable('embedding', [self.vocab_size, self.hidden_size], dtype=tf.float32)
@@ -32,6 +34,13 @@ class DAModel(object):
         # create lists of (batch,step,hidden_size) inputs for models
         premise_inputs = tf.nn.embedding_lookup(embedding, self.premise)
         hypothesis_inputs = tf.nn.embedding_lookup(embedding, self.hypothesis)
+
+
+        if pretrained_embeddings is not None:
+            with tf.variable_scope("input_projection"):
+                premise_inputs = input_projection3D(premise_inputs, self.hidden_size)
+            with tf.variable_scope("input_projection", reuse=True):
+                hypothesis_inputs = input_projection3D(hypothesis_inputs, self.hidden_size)
 
         # run FF networks over inputs
         prem_attn = self.feed_forward_attention(premise_inputs, "premise_attention")
@@ -133,7 +142,7 @@ class DAModel(object):
             b1 = tf.get_variable("b1", [attn_size])
             b2 = tf.get_variable("b2", [attn_size])
 
-            if self.config.keep_prob:
+            if self.config.keep_prob < 1.0 and self.is_training:
                 k1 = tf.nn.dropout(k1, self.config.keep_prob)
                 k2 = tf.nn.dropout(k2, self.config.keep_prob)
 
@@ -154,7 +163,7 @@ class DAModel(object):
         hidden2_w = tf.get_variable("hidden2_w", [hidden_dim, hidden_dim])
         hidden2_b = tf.get_variable("hidden2_b", [hidden_dim])
 
-        if self.config.keep_prob:
+        if self.config.keep_prob < 1.0 and self.is_training:
             hidden1_w = tf.nn.dropout(hidden1_w, self.config.keep_prob)
             hidden2_w = tf.nn.dropout(hidden2_w, self.config.keep_prob)
 

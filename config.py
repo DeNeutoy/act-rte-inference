@@ -29,12 +29,16 @@ class IAAConfig(object):
   inference_size = 512
   hidden_size = 384
   max_epoch = 4
-  max_max_epoch = 13
+  max_max_epoch = 16
   keep_prob = 0.8
   lr_decay = 0.8
   batch_size = 32
   vocab_size = 10000
+
+  embedding_size = 300
   embedding_reg = 0.0001
+  train_embeddings = True
+  use_embeddings = False
 
 class DAConfig(object):
 
@@ -43,14 +47,18 @@ class DAConfig(object):
   max_grad_norm = 5
   num_layers = 2
   num_steps = 20
-  hidden_size = 300
+  hidden_size = 200
   max_epoch = 4
-  max_max_epoch = 13
+  max_max_epoch = 16
   keep_prob = 0.8
   lr_decay = 0.8
   batch_size = 32
   vocab_size = 10000
+
+  embedding_size = 300
   embedding_reg = None
+  train_embeddings = False
+  use_embeddings = True
 
 
 
