@@ -27,7 +27,7 @@ def run_epoch(session, models, data, training, verbose=False):
     epoch_size, id_to_data = bucket_shuffle(data)
 
     for step, (id,(x, y)) in enumerate(id_to_data):
-
+        step_time = time.time()
         m = models[id]
         assert x["premise"].shape == (m.premise.get_shape())
         assert x["hypothesis"].shape == (m.hypothesis.get_shape())
