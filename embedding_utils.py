@@ -19,5 +19,5 @@ def input_projection3D(input3D, projection_size):
     b_proj = tf.get_variable("b_proj", [projection_size])
 
     projection = tf.nn.conv2d(inputs, W_proj, [1,1,1,1], "SAME")
-
-    return tf.squeeze(tf.nn.bias_add(projection, b_proj))
+    projection = tf.tanh(tf.nn.bias_add(projection,b_proj))
+    return tf.squeeze(projection)

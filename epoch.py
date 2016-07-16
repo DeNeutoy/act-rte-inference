@@ -27,7 +27,6 @@ def run_epoch(session, models, data, training, verbose=False):
     epoch_size, id_to_data = bucket_shuffle(data)
 
     for step, (id,(x, y)) in enumerate(id_to_data):
-        step_time = time.time()
         m = models[id]
         assert x["premise"].shape == (m.premise.get_shape())
         assert x["hypothesis"].shape == (m.hypothesis.get_shape())
@@ -36,14 +35,10 @@ def run_epoch(session, models, data, training, verbose=False):
             eval_op = m.train_op
         else:
             eval_op = tf.no_op()
+
         batch_acc, cost, _ = session.run([m.accuracy, m.cost, eval_op], feed_dict={m.premise: x["premise"],
                                       m.hypothesis: x["hypothesis"],
                                       m.targets: y})
-
-        # if step == 0:
-        #     first_acc = batch_acc
-        # if (step == epoch_size // 2) and (batch_acc <= first_acc) and training:
-        #     session.run(tf.assign(m.lr, m.config.learning_rate * m.config.lr_decay))
 
         costs += cost
         iters += 1
@@ -57,6 +52,5 @@ def run_epoch(session, models, data, training, verbose=False):
 
 
     return (costs / iters), (accuracy / iters)
-
 
 

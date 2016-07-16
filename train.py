@@ -13,6 +13,7 @@ from Vocab import Vocab
 from IAAModel import IAAModel
 from DAModel import DAModel
 from AdaptiveIAAModel import AdaptiveIAAModel
+from AdaptiveReader import AdaptiveReader
 from embedding_utils import import_embeddings
 import saveload
 import argparse
@@ -26,7 +27,9 @@ def get_config_and_model(conf):
     elif conf == "IAAModel":
         return IAAModel, CONFIG.IAAConfig()
     elif conf == "AdaptiveIAAModel":
-        return AdaptiveIAAModel, CONFIG.IAAConfig()
+        return AdaptiveIAAModel, CONFIG.AdaptiveIAAConfig()
+    elif conf == "AdaptiveReader":
+        return  AdaptiveReader, CONFIG.IAAConfig()
 
 def main(unused_args):
     saved_model_path = args.model_path
