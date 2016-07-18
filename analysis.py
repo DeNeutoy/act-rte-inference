@@ -23,14 +23,14 @@ import numpy as np
 import time
 from collections import defaultdict
 
-def analysis_epoch(session, models, data, training, verbose=False):
+def analysis_epoch(session, models, data, vocab):
     """Runs the model on the given data."""
     #epoch_size = ((len(data) // m.batch_size) - 1) // m.num_steps
     start_time = time.time()
     costs = 0.0
     iters = 0
     accuracy = 0.0
-    first_acc = 0.0
+    return_data = []
     epoch_size, id_to_data = bucket_shuffle(data)
 
     for step, (id,(x, y)) in enumerate(id_to_data):
@@ -42,10 +42,14 @@ def analysis_epoch(session, models, data, training, verbose=False):
                                       m.hypothesis: x["hypothesis"],
                                       m.targets: y})
 
-        print(probs)
-        print(prem)
-        print(hyp)
-
+        stats = {}
+        stats["act_probs"] = probs.squeeze()
+        stats["premise"] = vocab.tokens_for_ids(x["premise"].squeeze().tolist())
+        stats["premise_attention"] = prem.squeeze()
+        stats["hypothesis"] = vocab.tokens_for_ids(x["hypothesis"].squeeze().tolist())
+        stats["hypothesis_attention"] = hyp.squeeze()
+        stats["correct"] = batch_acc
+        return_data.append(stats)
 
         costs += cost
         iters += 1
@@ -58,7 +62,7 @@ def analysis_epoch(session, models, data, training, verbose=False):
                iters * m.batch_size / (time.time() - start_time)))
 
 
-    return (costs / iters), (accuracy / iters)
+    return (costs / iters), (accuracy / iters), return_data
 
 def get_config_and_model(conf):
 
@@ -91,7 +95,7 @@ def main(unused_args):
 
     eval_config.vocab_size = vocab.size()
     eval_config.vocab_size = vocab.size()
-    eval_config.batch_size = 32
+    eval_config.batch_size = 1
 
     train, val, test = "snli_1.0_train.jsonl","snli_1.0_dev.jsonl","snli_1.0_test.jsonl"
 
@@ -110,11 +114,10 @@ def main(unused_args):
         raw_data = snli_reader.load_data(args.data_path,train, val, test, vocab, False,
                             max_records=None, buckets=buckets, batch_size=eval_config.batch_size)
 
-    train_data, val_data, test_data, stats = raw_data
+    _,_, test_data, stats = raw_data
     print(stats)
-
-
     test_buckets = {x:v for x,v in enumerate(test_data)}
+
 
     if eval_config.use_embeddings:
         print("loading embeddings from {}".format(embeddings))
@@ -165,11 +168,7 @@ def main(unused_args):
 
                             session.run(tf.assign(v_dic[key], value))
 
-
-
-
-
-            test_loss, test_acc = analysis_epoch(session, models_test, test_buckets, training=False)
+            test_loss, test_acc, processed_data = analysis_epoch(session, models_test, test_buckets,vocab)
             date = "{:%m.%d.%H.%M}".format(datetime.now())
 
             trainingStats["test_loss"].append(test_loss)
@@ -177,8 +176,7 @@ def main(unused_args):
 
             saveload.main(weights_dir + "/FinalTestAcc_{:0.5f}date{}.pkl"
                                   .format(test_acc, date), session)
-            pickle.dump(trainingStats,open(os.path.join(weights_dir, "stats.pkl"), "wb"))
-
+            pickle.dump(processed_data, open(os.path.join(weights_dir, "processed_data.pkl"), "wb"))
             if verbose:
                 print("Test Accuracy: {}".format(test_acc))
 

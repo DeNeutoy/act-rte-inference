@@ -247,7 +247,7 @@ class AdaptiveIAAModel(object):
             hidden2_b = tf.get_variable("hidden2_b", [size])
 
             sigmoid_w = tf.get_variable("sigmoid_w", [size, 2*self.config.encoder_size])
-            sigmoid_b = tf.get_variable("sigmoid_b", [self.batch_size, 2*self.config.encoder_size])
+            sigmoid_b = tf.get_variable("sigmoid_b", [2*self.config.encoder_size])
 
             if self.config.keep_prob < 1.0 and self.is_training:
                 hidden1_w = tf.nn.dropout(hidden1_w, self.config.keep_prob)

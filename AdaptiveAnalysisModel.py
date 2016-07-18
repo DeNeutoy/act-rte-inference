@@ -187,7 +187,7 @@ class AdaptiveAnalysisModel(object):
              batch_mask,prob_compare,prob,
              counter,initial_state,premise, hypothesis, acc_states])
 
-        array_probs = array_probs.write(i,1.0-remainders)
+        #array_probs = array_probs.write(i-1,1.0-remainders)
         self.ACTPROB = array_probs.pack()
         self.ACTPREMISEATTN = premise_attention.pack()
         self.ACTHYPOTHESISATTN = hypothesis_attention.pack()
@@ -221,11 +221,7 @@ class AdaptiveAnalysisModel(object):
         prob += p * new_float_mask
         prob_compare += p * tf.cast(batch_mask, tf.float32)
 
-        array_probs = array_probs.write(i, prob)
-        premise_attention = premise_attention.write(i, prem_weights)
-        hypothesis_attention = hypothesis_attention.write(i, hyp_weights)
 
-        i += 1
 
         def use_remainder():
 
@@ -233,23 +229,31 @@ class AdaptiveAnalysisModel(object):
             remainder_expanded = tf.expand_dims(remainder,1)
             tiled_remainder = tf.tile(remainder_expanded,[1,self.config.encoder_size*4])
 
+            ap = array_probs.write(i, remainder)
+            ha= hypothesis_attention.write(i, hyp_weights)
+            pa = premise_attention.write(i, prem_weights)
             acc_state = (new_state * tiled_remainder) + acc_states
-            return acc_state
+            return ap,ha,pa,acc_state
 
         def normal():
 
             p_expanded = tf.expand_dims(p * new_float_mask,1)
             tiled_p = tf.tile(p_expanded,[1,self.config.encoder_size*4])
 
+            ap= array_probs.write(i, p*new_float_mask)
+            pa = premise_attention.write(i, prem_weights)
+            ha= hypothesis_attention.write(i, hyp_weights)
             acc_state = (new_state * tiled_p) + acc_states
-            return acc_state
+            return ap,ha,pa,acc_state
 
 
         counter += tf.constant(1.0,tf.float32,[self.batch_size]) * new_float_mask
         counter_condition = tf.less(counter,self.N)
         condition = tf.reduce_any(tf.logical_and(new_batch_mask,counter_condition))
 
-        acc_state = tf.cond(condition, normal, use_remainder)
+        array_probs, hypothesis_attention,\
+        premise_attention,acc_state = tf.cond(condition, normal, use_remainder)
+        i += 1
 
         return (i,array_probs, premise_attention, hypothesis_attention,
                 new_batch_mask, prob_compare,prob,counter, new_state,
@@ -269,7 +273,7 @@ class AdaptiveAnalysisModel(object):
             hidden2_b = tf.get_variable("hidden2_b", [size])
 
             sigmoid_w = tf.get_variable("sigmoid_w", [size, 2*self.config.encoder_size])
-            sigmoid_b = tf.get_variable("sigmoid_b", [self.batch_size, 2*self.config.encoder_size])
+            sigmoid_b = tf.get_variable("sigmoid_b", [2*self.config.encoder_size])
 
             if self.config.keep_prob < 1.0 and self.is_training:
                 hidden1_w = tf.nn.dropout(hidden1_w, self.config.keep_prob)

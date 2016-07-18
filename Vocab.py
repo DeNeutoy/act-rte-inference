@@ -78,3 +78,16 @@ class Vocab(object):
 
     def ids_for_tokens(self, tokens, update=True):
         return [self.id_for_token(t, update) for t in tokens]
+
+
+    def token_for_id(self, id):
+
+        if id in self.id_token:
+            return self.id_token[id]
+
+        else:
+            print("ID not in vocab, returning <UNK>")
+            return self.UNK_ID
+
+    def tokens_for_ids(self, ids):
+        return [self.token_for_id(x) for x in ids]
