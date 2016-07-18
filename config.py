@@ -84,6 +84,7 @@ class AdaptiveIAAConfig(object):
 
   eps = 0.01
   max_compuation = 20
+  step_penalty = 0.0001
 
 
 

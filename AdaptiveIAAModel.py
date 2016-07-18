@@ -101,7 +101,7 @@ class AdaptiveIAAModel(object):
                 [targets],
                 [tf.ones([batch_size])],
                 3)
-        self.cost = tf.reduce_mean(loss) + 0.0001*tf.reduce_mean((self.remainder) + tf.cast(iterations, tf.float32))
+        self.cost = tf.reduce_mean(loss) + self.config.step_penalty*tf.reduce_mean((self.remainder) + tf.cast(iterations, tf.float32))
 
         if self.config.embedding_reg and update_embeddings:
             self.cost += self.config.embedding_reg * (tf.reduce_mean(tf.square(embedding)))

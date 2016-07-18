@@ -52,11 +52,9 @@ class AttentiveACTCell(rnn_cell.RNNCell):
             # While loop stops when this predicate is FALSE.
             # Ie all (probability < 1-eps AND counter < N) are false.
 
-            x = self.ACTStep(batch_mask,prob_compare,prob,counter,state,inputs,acc_outputs,acc_states)
-
 
             pred = lambda batch_mask,prob_compare,prob,\
-                          counter,state,input,acc_output,acc_state:\
+                          counter,state,inputs,acc_output,acc_state:\
                 tf.reduce_any(
                     tf.logical_and(
                         tf.less(prob_compare,self.one_minus_eps),
@@ -84,40 +82,33 @@ class AttentiveACTCell(rnn_cell.RNNCell):
             tf.add_n(self.ACT_remainder)/len(self.ACT_remainder) +
             tf.to_float(tf.add_n(self.ACT_iterations)/len(self.ACT_iterations)))
 
-    def word_by_word_attention(self,state, prev_rep):
+    def attention(self, query, attendees, scope):
+        """Put attention masks on hidden using hidden_features and query."""
 
-        # encoder outputs: [batch_size x encoder_hidden_size]
-        # state =
+        attn_length = attendees.get_shape()[1].value
+        attn_size = attendees.get_shape()[2].value
 
-        seq_length = len(self.encoder_outputs)
+        with tf.variable_scope(scope):
 
-        # TODO: Check which way round this is - is is batch, seq or seq, batch?
-        input_elements = tf.concat(1, [tf.expand_dims(x, 1)
-                                   for x in self.encoder_outputs])
+            hidden = tf.reshape(attendees, [-1, attn_length, 1, attn_size])
+            k = tf.get_variable("attention_W", [1,1,attn_size,attn_size])
 
-        W_y = tf.get_variable("encoder_weight", [self.state_size, self.state_size],dtype=tf.float32)
-        W_h = tf.get_variable("state_weight", [self.state_size, self.state_size],dtype=tf.float32)
-        W_r = tf.get_variable("prev_rep_weight",[self.state_size, self.state_size],dtype=tf.float32)
+            features = tf.nn.conv2d(hidden, k, [1, 1, 1, 1], "SAME")
+            v = tf.get_variable("attention_v", [attn_size])
 
-        # this is fine
-        hyp_contrib = tf.matmul(state,W_h) + tf.matmul(prev_rep, W_r)
-        hyp_contribution = tf.pack([hyp_contrib] * seq_length)
+            with tf.variable_scope("attention"):
 
-        # TODO Check!! hyp_contrib is seq, batch, perhaps it should be the other way round?
-        M_t = tf.tanh(tf.batch_matmul(input_elements, tf.pack([W_y]* seq_length)) + hyp_contribution)
+                y = tf.nn.rnn_cell._linear(query, attn_size, True)
 
-        # TODO reshape M_t to get (batch*seq, hidden_dim)
-        softmax_w = tf.get_variable("softmax_w", [self.state_size, seq_length])
-        softmax_b = tf.get_variable("softmax_b", [seq_length])
-        w = tf.get_variable("w", [self.state_size])
-        logits = tf.matmul(tf.matmul(tf.transpose(w),M_t), softmax_w) + softmax_b
+                y = tf.reshape(y, [-1, 1, 1, attn_size])
+                # Attention mask is a softmax of v^T * tanh(...).
+                s = tf.reduce_sum(v * tf.tanh(features + y), [2, 3])
+                a = tf.nn.softmax(s)
+                # Now calculate the attention-weighted vector d.
+                d = tf.reduce_sum(tf.reshape(a, [-1, attn_length, 1, 1]) * hidden,[1, 2])
+                ds = tf.reshape(d, [-1, attn_size])
 
-        alpha_t = tf.nn.softmax(logits)
-
-        weighted_states = tf.matmul(input_elements, tf.transpose(alpha_t))
-        W_t = tf.get_variable("output_non_linearity", [self.state_size, self.state_size])
-
-        return weighted_states + tf.matmul(W_t, prev_rep)
+        return ds
 
     def ACTStep(self,batch_mask,prob_compare,prob,counter,attended_state,input,acc_outputs,acc_states):
 
@@ -141,12 +132,10 @@ class AttentiveACTCell(rnn_cell.RNNCell):
 
         output, new_state = rnn(self.cell, [input_with_flags], attended_state, scope=type(self.cell).__name__)
 
-        attended_state = self.word_by_word_attention(new_state,attended_state)
-
-        # TODO: interesting to see the difference between using the attended state here?
+        attended_state = self.attention(new_state, self.encoder_outputs, "ACT_attention")
 
         with tf.variable_scope('sigmoid_activation_for_pondering'):
-            p = tf.squeeze(tf.sigmoid(tf.nn.rnn_cell._linear(new_state, 1, True)))
+            p = tf.squeeze(tf.sigmoid(tf.nn.rnn_cell._linear(attended_state, 1, True)))
 
         # multiply by the previous mask as if we stopped before, we don't want to start again
         # if we generate a p less than p_t-1 for a given example.
@@ -176,7 +165,7 @@ class AttentiveACTCell(rnn_cell.RNNCell):
             remainder_expanded = tf.expand_dims(remainder,1)
             tiled_remainder = tf.tile(remainder_expanded,[1,self.output_size])
 
-            acc_state = (new_state * tiled_remainder) + acc_states
+            acc_state = (attended_state * tiled_remainder) + acc_states
             acc_output = (output[0] * tiled_remainder) + acc_outputs
             return acc_state, acc_output
 
@@ -191,7 +180,7 @@ class AttentiveACTCell(rnn_cell.RNNCell):
             p_expanded = tf.expand_dims(p * new_float_mask,1)
             tiled_p = tf.tile(p_expanded,[1,self.output_size])
 
-            acc_state = (new_state * tiled_p) + acc_states
+            acc_state = (attended_state * tiled_p) + acc_states
             acc_output = (output[0] * tiled_p) + acc_outputs
             return acc_state, acc_output
 

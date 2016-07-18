@@ -73,13 +73,7 @@ def main(unused_args):
     train_data, val_data, test_data, stats = raw_data
     print(stats)
 
-    # data = list(bucketed data)
-    # bucketed data = list(tuple(dict(hypothesis,premise), target))
-    # where the sentences will be of length buckets[bucket_id]
 
-    # bucket_id : data
-    train_buckets = {x:v for x,v in enumerate(train_data)}
-    val_buckets = {x:v for x,v in enumerate(val_data)}
     test_buckets = {x:v for x,v in enumerate(test_data)}
 
     if config.use_embeddings:
@@ -111,62 +105,23 @@ def main(unused_args):
         # generate a model per bucket which share parameters
         # store in list where index corresponds to the id of the batch
         with tf.variable_scope("all_models_with_buckets"):
-            models, models_val, models_test = [], [], []
+            models_test = []
 
-            for i in range(len(train_buckets)):
+            for i in range(len(test_buckets)):
                 # correct config for this bucket
                 config.prem_steps, config.hyp_steps = buckets[i]
                 eval_config.prem_steps, eval_config.hyp_steps = buckets[i]
 
                 with tf.variable_scope('model', reuse= True if i > 0 else None, initializer=initialiser):
 
-                    models.append(MODEL(config, pretrained_embeddings=embedding_var,
-                                        update_embeddings=config.train_embeddings, is_training=True))
-
                     #### Reload Model ####
                     if saved_model_path is not None:
                         saveload.main(saved_model_path, session)
 
-                with tf.variable_scope('model', reuse=True):
-                    models_val.append(MODEL(config, pretrained_embeddings=embedding_var,
-                                            update_embeddings=config.train_embeddings, is_training=False))
                     models_test.append(MODEL(eval_config, pretrained_embeddings=embedding_var,
                                              update_embeddings=config.train_embeddings, is_training=False))
 
-                tf.initialize_all_variables().run()
 
-
-            print("beginning training")
-
-            for i in range(config.max_max_epoch):
-                #lr_decay = config.lr_decay ** max(i - config.max_epoch, 0.0)
-                #session.run(tf.assign(m[model].lr, config.learning_rate * lr_decay))
-                print("Epoch {}, Training data".format(i + 1))
-                train_loss, train_acc = run_epoch(session, models, train_buckets,training=True, verbose=True)
-                print ("Epoch {}, Validation data".format(i + 1))
-                valid_loss, valid_acc = run_epoch(session, models_val, val_buckets,training=False)
-
-                trainingStats["train_loss"].append(train_loss)
-                trainingStats["train_acc"].append(train_acc)
-                trainingStats["val_loss"].append(valid_loss)
-                trainingStats["val_acc"].append(valid_acc)
-                trainingStats["epoch"].append(i)
-
-                if trainingStats["val_acc"][i-1] >= trainingStats["val_acc"][i]:
-                    print("decaying learning rate")
-                    current_lr = session.run(models[0].lr)
-                    session.run(tf.assign(models[0].lr, config.lr_decay * current_lr))
-
-                print("Epoch: {} Train Loss: {} Train Acc: {}".format(i + 1, train_loss, train_acc))
-                print("Epoch: {} Valid Loss: {} Valid Acc: {}".format(i + 1, valid_loss, valid_acc))
-
-                #######    Model Hooks    ########
-                if weights_dir is not None:
-                    date = "{:%m.%d.%H.%M}".format(datetime.now())
-                    saveload.main(weights_dir + "/Epoch_{:02}Train_{:0.3f}Val_{:0.3f}date{}.pkl"
-                                  .format(i+1,train_acc,valid_acc, date), session)
-
-                    pickle.dump(trainingStats,open(os.path.join(weights_dir, "stats.pkl"), "wb"))
 
             test_loss, test_acc = run_epoch(session, models_test, test_buckets, training=False)
             date = "{:%m.%d.%H.%M}".format(datetime.now())
@@ -176,7 +131,6 @@ def main(unused_args):
 
             saveload.main(weights_dir + "/FinalTestAcc_{:0.5f}date{}.pkl"
                                   .format(test_acc, date), session)
-
             pickle.dump(trainingStats,open(os.path.join(weights_dir, "stats.pkl"), "wb"))
 
             if verbose:
