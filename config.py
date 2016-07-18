@@ -83,7 +83,7 @@ class AdaptiveIAAConfig(object):
   use_embeddings = False
 
   eps = 0.01
-  max_compuation = 20
+  max_computation = 20
   step_penalty = 0.0001
 
 

@@ -159,7 +159,7 @@ class AdaptiveAnalysisModel(object):
         prob = tf.constant(0.0,tf.float32,[self.batch_size], name="prob")
         prob_compare = tf.constant(0.0,tf.float32,[self.batch_size], name="prob_compare")
         counter = tf.constant(0.0, tf.float32,[self.batch_size], name="counter")
-        i = tf.constant(0, tf.float32, name="counter")
+        i = tf.constant(0, tf.int32, name="index")
         acc_states = tf.zeros_like(initial_state, tf.float32, name="state_accumulator")
         batch_mask = tf.constant(True, tf.bool,[self.batch_size])
 
@@ -181,7 +181,7 @@ class AdaptiveAnalysisModel(object):
                 # only stop if all of the batch have passed either threshold
 
             # Do while loop iterations until predicate above is false.
-        _,array_probs,premise_attention,hypothesis_attention_,_,remainders,iterations,_,_,_,state = \
+        i,array_probs,premise_attention,hypothesis_attention,_,_,remainders,iterations,_,_,_,state = \
             tf.while_loop(pred,self.inference_step,
             [i,array_probs, premise_attention, hypothesis_attention,
              batch_mask,prob_compare,prob,
@@ -222,8 +222,8 @@ class AdaptiveAnalysisModel(object):
         prob_compare += p * tf.cast(batch_mask, tf.float32)
 
         array_probs = array_probs.write(i, prob)
-        premise_attention.write(i, prem_attn)
-        hypothesis_attention.write(i, hyp_attn)
+        premise_attention = premise_attention.write(i, prem_weights)
+        hypothesis_attention = hypothesis_attention.write(i, hyp_weights)
 
         i += 1
 
@@ -251,7 +251,7 @@ class AdaptiveAnalysisModel(object):
 
         acc_state = tf.cond(condition, normal, use_remainder)
 
-        return (array_probs, premise_attention, hypothesis_attention,
+        return (i,array_probs, premise_attention, hypothesis_attention,
                 new_batch_mask, prob_compare,prob,counter, new_state,
                 premise, hypothesis, acc_state)
 

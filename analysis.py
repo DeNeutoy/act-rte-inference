@@ -91,7 +91,7 @@ def main(unused_args):
 
     eval_config.vocab_size = vocab.size()
     eval_config.vocab_size = vocab.size()
-    eval_config.batch_size = 1
+    eval_config.batch_size = 32
 
     train, val, test = "snli_1.0_train.jsonl","snli_1.0_dev.jsonl","snli_1.0_test.jsonl"
 
@@ -153,12 +153,19 @@ def main(unused_args):
 
                 with tf.variable_scope('model', reuse= True if i > 0 else None, initializer=initialiser):
 
-                    #### Reload Model ####
-                    if saved_model_path is not None:
-                        saveload.main(saved_model_path, session)
-
                     models_test.append(MODEL(eval_config, pretrained_embeddings=embedding_var,
                                              update_embeddings=eval_config.train_embeddings, is_training=False))
+                    #### Reload Model ####
+                    if saved_model_path is not None:
+
+                        v_dic = {v.name: v for v in tf.trainable_variables()}
+                        loaded_weights = pickle.load(open(saved_model_path, "rb"))
+
+                        for key, value in loaded_weights.items():
+
+                            session.run(tf.assign(v_dic[key], value))
+
+
 
 
 
