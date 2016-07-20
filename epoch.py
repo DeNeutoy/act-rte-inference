@@ -61,7 +61,7 @@ def extra_epoch(session, models, data, training, verbose=False):
     iters = 0
     accuracy = 0.0
     avg_steps = 0.0
-    var_steps = []
+    var_steps = 0.0
     epoch_size, id_to_data = bucket_shuffle(data)
 
     for step, (id,(x, y)) in enumerate(id_to_data):
@@ -79,7 +79,7 @@ def extra_epoch(session, models, data, training, verbose=False):
                                       m.targets: y})
 
         avg_steps += np.mean(act_steps)
-        var_steps += list(act_steps)
+        var_steps += np.sum(np.square(act_steps))
         costs += cost
         iters += 1
         accuracy += batch_acc
@@ -90,5 +90,5 @@ def extra_epoch(session, models, data, training, verbose=False):
                costs / iters,
                iters * m.batch_size / (time.time() - start_time)))
 
-
-    return (costs / iters), (accuracy / iters), (avg_steps/iters), np.var(var_steps)
+    variance = var_steps/iters*m.batch_size - np.square(avg_steps/iters)
+    return (costs / iters), (accuracy / iters), (avg_steps/iters), variance
