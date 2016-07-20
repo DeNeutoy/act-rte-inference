@@ -187,7 +187,6 @@ class AdaptiveAnalysisModel(object):
              batch_mask,prob_compare,prob,
              counter,initial_state,premise, hypothesis, acc_states])
 
-        #array_probs = array_probs.write(i-1,1.0-remainders)
         self.ACTPROB = array_probs.pack()
         self.ACTPREMISEATTN = premise_attention.pack()
         self.ACTHYPOTHESISATTN = hypothesis_attention.pack()
