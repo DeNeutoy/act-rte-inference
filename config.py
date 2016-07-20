@@ -34,6 +34,7 @@ class IAAConfig(object):
   lr_decay = 0.8
   batch_size = 32
   vocab_size = 10000
+  bidirectional = False
 
   embedding_size = 300
   embedding_reg = 0.0001
@@ -76,6 +77,7 @@ class AdaptiveIAAConfig(object):
   lr_decay = 0.8
   batch_size = 32
   vocab_size = 10000
+  bidirectional = False
 
   embedding_size = 300
   embedding_reg = 0.0001
@@ -84,7 +86,7 @@ class AdaptiveIAAConfig(object):
 
   eps = 0.01
   max_computation = 20
-  step_penalty = 0.0001
+  step_penalty = 0.00001
 
 
 

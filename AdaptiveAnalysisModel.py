@@ -7,9 +7,11 @@ class AdaptiveAnalysisModel(object):
     """ Implements Iterative Alternating Attention for Machine Reading
         http://arxiv.org/pdf/1606.02245v3.pdf """
 
-    def __init__(self, config, pretrained_embeddings=None,update_embeddings=True, is_training=False):
+    def __init__(self, config, pretrained_embeddings=None,
+                 update_embeddings=True, is_training=False):
 
         self.config = config
+        self.bidirectional = config.bidirectional
         self.batch_size = batch_size = config.batch_size
         self.hidden_size = hidden_size = config.hidden_size
         self.num_layers = 1
@@ -54,7 +56,12 @@ class AdaptiveAnalysisModel(object):
             self.prem_cell_b = rnn_cell.MultiRNNCell([prem_b]* self.num_layers)
 
         # run GRUs over premise + hypothesis
-        premise_outputs, prem_state_f, prem_state_b = rnn.bidirectional_rnn(self.prem_cell_f,self.prem_cell_b, premise_inputs,dtype=tf.float32, scope="gru_premise")
+        if self.bidirectional:
+            premise_outputs, prem_state_f, prem_state_b = rnn.bidirectional_rnn(
+                self.prem_cell_f,self.prem_cell_b, premise_inputs,dtype=tf.float32, scope="gru_premise")
+        else:
+            premise_outputs, prem_state = rnn.rnn(
+                self.prem_cell_f, premise_inputs, dtype=tf.float32, scope="gru_premise")
 
         premise_outputs = tf.concat(1, [tf.expand_dims(x,1) for x in premise_outputs])
 
@@ -66,10 +73,13 @@ class AdaptiveAnalysisModel(object):
             hyp_b = rnn_cell.GRUCell(self.config.encoder_size)
             self.hyp_cell_b = rnn_cell.MultiRNNCell([hyp_b] * self.num_layers)
 
-        hyp_outputs, hyp_state_f, hyp_state_b = rnn.bidirectional_rnn(self.hyp_cell_f,self.hyp_cell_b,hypothesis_inputs,
-                                                     dtype=tf.float32, scope= "gru_hypothesis")
-        hyp_outputs = tf.concat(1, [tf.expand_dims(x,1) for x in hyp_outputs])
+        if self.bidirectional:
+            hyp_outputs, hyp_state_f, hyp_state_b = rnn.bidirectional_rnn(
+                self.hyp_cell_f,self.hyp_cell_b,hypothesis_inputs,dtype=tf.float32, scope= "gru_hypothesis")
+        else:
+            hyp_outputs, hyp_state = rnn.rnn(self.hyp_cell_f,hypothesis_inputs, dtype=tf.float32, scope="gru_hypothesis")
 
+        hyp_outputs = tf.concat(1, [tf.expand_dims(x,1) for x in hyp_outputs])
 
 
 
@@ -263,7 +273,12 @@ class AdaptiveAnalysisModel(object):
 
         with tf.variable_scope(scope):
 
-            size = 3*2*self.config.encoder_size + self.config.inference_size
+            if self.bidirectional:
+                size = 3*2*self.config.encoder_size + self.config.inference_size
+                out_size = 2*self.config.encoder_size
+            else:
+                size = 3*self.config.encoder_size + self.config.inference_size
+                out_size = self.config.encoder_size
 
             hidden1_w = tf.get_variable("hidden1_w", [size, size])
             hidden1_b = tf.get_variable("hidden1_b", [size])
@@ -271,8 +286,8 @@ class AdaptiveAnalysisModel(object):
             hidden2_w = tf.get_variable("hidden2_w", [size, size])
             hidden2_b = tf.get_variable("hidden2_b", [size])
 
-            sigmoid_w = tf.get_variable("sigmoid_w", [size, 2*self.config.encoder_size])
-            sigmoid_b = tf.get_variable("sigmoid_b", [2*self.config.encoder_size])
+            sigmoid_w = tf.get_variable("sigmoid_w", [size, out_size])
+            sigmoid_b = tf.get_variable("sigmoid_b", [out_size])
 
             if self.config.keep_prob < 1.0 and self.is_training:
                 hidden1_w = tf.nn.dropout(hidden1_w, self.config.keep_prob)
