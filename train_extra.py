@@ -140,11 +140,11 @@ def main(unused_args):
                     except:
                         print("unable to rejoin original statistics - ignore if not continuing training.")
 
-
-
+            epochs = [i for i in range(config.max_max_epoch)]
+            epochs = epochs[len(trainingStats["epoch"]):]
             print("beginning training")
 
-            for i in range(config.max_max_epoch):
+            for i in epochs:
                 #lr_decay = config.lr_decay ** max(i - config.max_epoch, 0.0)
                 #session.run(tf.assign(m[model].lr, config.learning_rate * lr_decay))
                 print("Epoch {}, Training data".format(i + 1))
