@@ -123,9 +123,6 @@ def main(unused_args):
                     models.append(MODEL(config, pretrained_embeddings=embedding_var,
                                         update_embeddings=config.train_embeddings, is_training=True))
 
-                    #### Reload Model ####
-                    if saved_model_path is not None:
-                        saveload.main(saved_model_path, session)
 
                 with tf.variable_scope('model', reuse=True):
                     models_val.append(MODEL(config, pretrained_embeddings=embedding_var,
@@ -134,6 +131,15 @@ def main(unused_args):
                                              update_embeddings=config.train_embeddings, is_training=False))
 
                 tf.initialize_all_variables().run()
+
+                        #### Reload Model ####
+                if saved_model_path is not None:
+                    saveload.main(saved_model_path, session)
+                    try:
+                        trainingStats = pickle.load(open(os.path.join(weights_dir,"stats.pkl"), "rb"))
+                    except:
+                        print("unable to rejoin original statistics - ignore if not continuing training.")
+
 
 
             print("beginning training")
