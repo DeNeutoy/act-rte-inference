@@ -173,7 +173,8 @@ def main(unused_args):
 
             trainingStats["test_loss"].append(test_loss)
             trainingStats["test_acc"].append(test_acc)
-
+            print("Test Accuracy:", test_acc)
+            print("Test Loss:", test_loss)
             saveload.main(weights_dir + "/FinalTestAcc_{:0.5f}date{}.pkl"
                                   .format(test_acc, date), session)
             pickle.dump(processed_data, open(os.path.join(weights_dir, "processed_data.pkl"), "wb"))
