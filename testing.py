@@ -25,13 +25,14 @@ y = W * x_data + b
 loss = tf.reduce_mean(tf.square(y - y_data))
 optimizer = tf.train.AdamOptimizer(0.1)
 train = optimizer.minimize(loss)
-
+test_array = []
 def MyLoop(coord, session, i):
   while not coord.should_stop():
 
     x,y, _ = session.run([W,b,train])
     print(x,y)
     i +=1
+    test_array.append(x)
     if i > 200:
       coord.request_stop()
 
@@ -50,7 +51,7 @@ W,b  = session.run([W, b])
 
 print("final")
 print(W, b)
-
+print(test_array)
 
 
 

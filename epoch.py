@@ -3,6 +3,8 @@ import numpy as np
 from random import shuffle
 from itertools import chain
 import tensorflow as tf
+import threading
+from queue import Queue
 
 def bucket_shuffle(dict_data):
     # zip each data tuple with it's bucket id.
@@ -43,8 +45,8 @@ def run_epoch(session, models, data, training, verbose=False):
         costs += cost
         iters += 1
         accuracy += batch_acc
-        if step % (epoch_size // 10) == 10:
-            print("%.3f acc: %.3f loss: %.3f speed: %.0f examples/s" %
+        #if step % (epoch_size // 10) == 10:
+        print("%.3f acc: %.3f loss: %.3f speed: %.0f examples/s" %
               (step * 1.0 / epoch_size,
                accuracy / iters,
                costs / iters,
@@ -92,3 +94,6 @@ def extra_epoch(session, models, data, training, verbose=False):
 
     variance = var_steps/iters*m.batch_size - np.square(avg_steps/iters)
     return (costs / iters), (accuracy / iters), (avg_steps/iters), variance
+
+
+

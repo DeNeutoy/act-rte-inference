@@ -48,7 +48,7 @@ def main(unused_args):
         if not os.path.exists(weights_dir):
             os.mkdir(weights_dir)
 
-    vocab = Vocab(vocab_path, args.data_path,max_vocab_size=20000)
+    vocab = Vocab(vocab_path, args.data_path,max_vocab_size=40000)
 
     config.vocab_size = vocab.size()
     eval_config.vocab_size = vocab.size()

@@ -48,7 +48,7 @@ def main(unused_args):
         if not os.path.exists(weights_dir):
             os.mkdir(weights_dir)
 
-    vocab = Vocab(vocab_path, args.data_path,max_vocab_size=20000)
+    vocab = Vocab(vocab_path, args.data_path,max_vocab_size=40000)
 
     config.vocab_size = vocab.size()
     eval_config.vocab_size = vocab.size()
@@ -131,6 +131,9 @@ def main(unused_args):
                                              update_embeddings=config.train_embeddings, is_training=False))
 
                 tf.initialize_all_variables().run()
+
+                if config.use_embeddings:
+                    session.run([models[0].embedding_init],feed_dict={models[0].embedding_placeholder:embedding_var})
 
                 #### Reload Model ####
                 if saved_model_path is not None:

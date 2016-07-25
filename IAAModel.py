@@ -28,8 +28,9 @@ class IAAModel(object):
 
         if pretrained_embeddings is not None:
             embedding = tf.get_variable('embedding', [self.vocab_size, self.config.embedding_size], dtype=tf.float32,
-                                        initializer=tf.constant_initializer(pretrained_embeddings),
                                         trainable=update_embeddings)
+            self.embedding_placeholder = tf.placeholder(tf.float32, [self.vocab_size, self.config.embedding_size])
+            self.embedding_init = embedding.assign(self.embedding_placeholder)
         else:
             embedding = tf.get_variable('embedding', [self.vocab_size, self.hidden_size], dtype=tf.float32)
 
