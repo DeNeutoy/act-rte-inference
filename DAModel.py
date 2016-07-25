@@ -145,10 +145,13 @@ class DAModel(object):
             b2 = tf.get_variable("b2", [attn_size])
 
             if self.config.keep_prob < 1.0 and self.is_training:
-                k1 = tf.nn.dropout(k1, self.config.keep_prob)
-                k2 = tf.nn.dropout(k2, self.config.keep_prob)
+                hidden = tf.nn.dropout(hidden, self.config.keep_prob)
 
             features = tf.nn.relu(tf.nn.bias_add(tf.nn.conv2d(hidden, k1, [1, 1, 1, 1], "SAME"),b1))
+
+            if self.config.keep_prob < 1.0 and self.is_training:
+                features = tf.nn.dropout(features, self.config.keep_prob)
+
             features = tf.nn.relu(tf.nn.bias_add(tf.nn.conv2d(features, k2, [1,1,1,1], "SAME"), b2))
 
         return tf.squeeze(features)
@@ -166,10 +169,13 @@ class DAModel(object):
         hidden2_b = tf.get_variable("hidden2_b", [hidden_dim])
 
         if self.config.keep_prob < 1.0 and self.is_training:
-            hidden1_w = tf.nn.dropout(hidden1_w, self.config.keep_prob)
-            hidden2_w = tf.nn.dropout(hidden2_w, self.config.keep_prob)
+            input = tf.nn.dropout(input, self.config.keep_prob)
 
         hidden1 = tf.nn.relu(tf.matmul(input, hidden1_w) + hidden1_b)
+
+        if self.config.keep_prob < 1.0 and self.is_training:
+            hidden1 = tf.nn.dropout(hidden1, self.config.keep_prob)
+
         gate_output = tf.nn.relu(tf.matmul(hidden1, hidden2_w) + hidden2_b)
 
         return gate_output

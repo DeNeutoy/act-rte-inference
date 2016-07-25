@@ -209,10 +209,13 @@ class IAAModel(object):
             sigmoid_b = tf.get_variable("sigmoid_b", [out_size])
 
             if self.config.keep_prob < 1.0 and self.is_training:
-                hidden1_w = tf.nn.dropout(hidden1_w, self.config.keep_prob)
-                hidden2_w = tf.nn.dropout(hidden2_w, self.config.keep_prob)
+                gate_input = tf.nn.dropout(gate_input, self.config.keep_prob)
 
             hidden1 = tf.nn.relu(tf.matmul(gate_input, hidden1_w) + hidden1_b)
+
+            if self.config.keep_prob < 1.0 and self.is_training:
+                hidden1 = tf.nn.dropout(hidden1, self.config.keep_prob)
+
             hidden2 = tf.nn.relu(tf.matmul(hidden1, hidden2_w) + hidden2_b)
 
             gate_output = tf.nn.sigmoid(tf.matmul(hidden2, sigmoid_w) + sigmoid_b)
