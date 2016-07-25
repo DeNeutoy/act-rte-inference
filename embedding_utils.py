@@ -20,4 +20,4 @@ def input_projection3D(input3D, projection_size):
 
     projection = tf.nn.conv2d(inputs, W_proj, [1,1,1,1], "SAME")
     projection = tf.tanh(tf.nn.bias_add(projection,b_proj))
-    return tf.squeeze(projection)
+    return tf.reshape(projection, [-1, steps,hidden])
