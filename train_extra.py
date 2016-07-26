@@ -48,10 +48,23 @@ def main(unused_args):
         if not os.path.exists(weights_dir):
             os.mkdir(weights_dir)
 
-    vocab = Vocab(vocab_path, args.data_path,max_vocab_size=20000)
+    vocab = Vocab(vocab_path, args.data_path,max_vocab_size=40000)
 
     config.vocab_size = vocab.size()
     eval_config.vocab_size = vocab.size()
+
+    if args.grid_search:
+
+        config.hidden_size = args.hidden_size
+        config.learning_rate = args.learning_rate
+        config.eps = args.eps
+        config.step_penalty = args.step_penalty
+        config.keep_prob = args.keep_prob
+        eval_config.hidden_size = args.hidden_size
+        eval_config.learning_rate = args.learning_rate
+        eval_config.eps = args.eps
+        eval_config.step_penalty = args.step_penalty
+        eval_config.keep_prob = args.keep_prob
 
     train, val, test = "snli_1.0_train.jsonl","snli_1.0_dev.jsonl","snli_1.0_test.jsonl"
 
@@ -168,6 +181,7 @@ def main(unused_args):
 
                 if trainingStats["val_acc"][i-1] >= trainingStats["val_acc"][i]:
                     print("decaying learning rate")
+                    trainingStats["lr_decay"].append(i)
                     current_lr = session.run(models[0].lr)
                     session.run(tf.assign(models[0].lr, config.lr_decay * current_lr))
 
@@ -209,6 +223,7 @@ if __name__ == '__main__':
     parser.add_argument("--weights_dir")
     parser.add_argument("--verbose")
     parser.add_argument("--debug", action='store_true', default=False)
+    parser.add_argument("--grid_search", action='store_true', default=False)
     parser.add_argument("--vocab_path")
     parser.add_argument("--embedding_path")
 
