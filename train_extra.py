@@ -226,6 +226,12 @@ if __name__ == '__main__':
     parser.add_argument("--grid_search", action='store_true', default=False)
     parser.add_argument("--vocab_path")
     parser.add_argument("--embedding_path")
+    parser.add_argument("--hidden_size")
+    parser.add_argument("--learning_rate")
+    parser.add_argument("--eps")
+    parser.add_argument("--step_penalty")
+    parser.add_argument("--keep_prob")
+
 
     from sys import argv
 
