@@ -1,9 +1,9 @@
 #!/bin/bash -l
 
 echo 'Running Model'
-#$ -l tmem=12G
-#$ -l h_vmem=12G
-#$ -l h_rt=30:00:00
+#$ -l tmem=2G
+#$ -l h_vmem=2G
+#$ -l h_rt=3:00:00
 #These are optional flags but you problably want them in all jobs
 
 #$ -S /bin/bash
@@ -15,8 +15,8 @@ echo 'Running Model'
 export PYTHONPATH=${HOME}/.local/lib/python3.4/site-packages:${PYTHONPATH}
 export PYTHONPATH=${PYTHONPATH}:/home/mneumann/
 timestamp=`date -u +%Y-%m-%dT%H%MZ`
-mkdir "./out/grid_outputs/${timestamp}"
-mkdir "./out/grid_outputs/${timestamp}/grid_output"
+mkdir -p  "./out/grid_outputs/${timestamp}"
+mkdir -p  "./out/grid_outputs/${timestamp}/grid_output"
 
 
 i=$(expr $SGE_TASK_ID - 1)
@@ -68,6 +68,6 @@ LD_LIBRARY_PATH='/share/apps/mr/utils/libc6_2.17/lib/x86_64-linux-gnu/:/share/ap
                 --grid_search \
                 --learning_rate ${learning_rate[learning_rate_idx]} \
                 --hidden_size ${hidden_size[hidden_size_idx]} \
-                --keep_prob ${keep_prob[keep_prob]} \
+                --keep_prob ${keep_prob[keep_prob_idx]} \
                 --eps ${eps[eps_idx]} \
                 --step_penalty ${step_penalty[step_penalty_idx]} | tee "./out/grid_outputs/${timestamp}/${name}.txt"
