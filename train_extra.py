@@ -55,11 +55,11 @@ def main(unused_args):
 
     if args.grid_search:
 
-        config.hidden_size = args.hidden_size
-        config.learning_rate = args.learning_rate
-        config.eps = args.eps
-        config.step_penalty = args.step_penalty
-        config.keep_prob = args.keep_prob
+        config.hidden_size = int(args.hidden_size)
+        config.learning_rate = float(args.learning_rate)
+        config.eps = float(args.eps)
+        config.step_penalty = float(args.step_penalty)
+        config.keep_prob = float(args.keep_prob)
         eval_config.hidden_size = args.hidden_size
         eval_config.learning_rate = args.learning_rate
         eval_config.eps = args.eps
@@ -226,11 +226,11 @@ if __name__ == '__main__':
     parser.add_argument("--grid_search", action='store_true', default=False)
     parser.add_argument("--vocab_path")
     parser.add_argument("--embedding_path")
-    parser.add_argument("--hidden_size")
-    parser.add_argument("--learning_rate")
-    parser.add_argument("--eps")
-    parser.add_argument("--step_penalty")
-    parser.add_argument("--keep_prob")
+    parser.add_argument("--hidden_size", type=int)
+    parser.add_argument("--learning_rate", type=float)
+    parser.add_argument("--eps", type=float)
+    parser.add_argument("--step_penalty", type=float)
+    parser.add_argument("--keep_prob", type=float)
 
 
     from sys import argv
