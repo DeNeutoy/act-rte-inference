@@ -48,6 +48,8 @@ def main(unused_args):
         if not os.path.exists(weights_dir):
             os.mkdir(weights_dir)
 
+
+
     vocab = Vocab(vocab_path, args.data_path,max_vocab_size=40000)
 
     config.vocab_size = vocab.size()
@@ -60,11 +62,11 @@ def main(unused_args):
         config.eps = float(args.eps)
         config.step_penalty = float(args.step_penalty)
         config.keep_prob = float(args.keep_prob)
-        eval_config.hidden_size = args.hidden_size
-        eval_config.learning_rate = args.learning_rate
-        eval_config.eps = args.eps
-        eval_config.step_penalty = args.step_penalty
-        eval_config.keep_prob = args.keep_prob
+        eval_config.hidden_size = int(args.hidden_size)
+        eval_config.learning_rate = float(args.learning_rate)
+        eval_config.eps = float(args.eps)
+        eval_config.step_penalty = float(args.step_penalty)
+        eval_config.keep_prob = float(args.keep_prob)
 
     train, val, test = "snli_1.0_train.jsonl","snli_1.0_dev.jsonl","snli_1.0_test.jsonl"
 
