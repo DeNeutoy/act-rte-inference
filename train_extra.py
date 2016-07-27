@@ -145,19 +145,19 @@ def main(unused_args):
                     models_test.append(MODEL(eval_config, pretrained_embeddings=embedding_var,
                                              update_embeddings=config.train_embeddings, is_training=False))
 
-                tf.initialize_all_variables().run()
+            tf.initialize_all_variables().run()
 
-                if config.use_embeddings:
-                    session.run([models[0].embedding_init],feed_dict={models[0].embedding_placeholder:embedding_var})
-                    del embedding_var
+            if config.use_embeddings:
+                session.run([models[0].embedding_init],feed_dict={models[0].embedding_placeholder:embedding_var})
+                del embedding_var
 
-                        #### Reload Model ####
-                if saved_model_path is not None:
-                    saveload.main(saved_model_path, session)
-                    try:
-                        trainingStats = pickle.load(open(os.path.join(weights_dir,"stats.pkl"), "rb"))
-                    except:
-                        print("unable to rejoin original statistics - ignore if not continuing training.")
+                    #### Reload Model ####
+            if saved_model_path is not None:
+                saveload.main(saved_model_path, session)
+                try:
+                    trainingStats = pickle.load(open(os.path.join(weights_dir,"stats.pkl"), "rb"))
+                except:
+                    print("unable to rejoin original statistics - ignore if not continuing training.")
 
             epochs = [i for i in range(config.max_max_epoch)]
             epochs = epochs[len(trainingStats["epoch"]):]
