@@ -8,10 +8,10 @@ echo 'Running Model'
 
 #$ -S /bin/bash
 #$ -N adaptive-IAA-gridsearch
-#$ -wd /home/neumann/act-rte-inference
-#$ -t 1-2
+#$ -wd /home/mneumann/act-rte-inference
+#$ -t 1-80
 #$ -o ./out/grid_outputs/
-
+#Â$ -e ./out/gri_outputs/
 export PYTHONPATH=${HOME}/.local/lib/python3.4/site-packages:${PYTHONPATH}
 export PYTHONPATH=${PYTHONPATH}:/home/mneumann/
 timestamp=`date -u +%Y-%m-%dT%H%MZ`
@@ -20,12 +20,12 @@ mkdir -p  "./out/grid_outputs/${timestamp}/grid_output"
 
 
 i=$(expr $SGE_TASK_ID - 1)
-
+echo ${i}
 learning_rate=(0.001 0.0001)
 hidden_size=(128 256)
 keep_prob=(0.8 0.6)
 eps=(0.01 0.2)
-step_penalty=(0.01 0.001 0.0001 0.00001)
+step_penalty=(0.01 0.001 0.0001 0.00001 0.000001)
 
 total_steps=$((${#learning_rate[@]} * ${#hidden_size[@]} * ${#keep_prob[@]} * ${#eps[@]} * ${#step_penalty[@]}))
 echo ${total_steps}
@@ -58,10 +58,10 @@ name="AIAA_lr_${learning_rate[learning_rate_idx]}hid_${hidden_size[hidden_size_i
 echo ${name}
 LD_LIBRARY_PATH='/share/apps/mr/utils/libc6_2.17/lib/x86_64-linux-gnu/:/share/apps/mr/utils/lib6_2.17/usr/lib64/:/share/apps/gcc-5.2.0/lib64:/share/apps/gcc-5.2.0/lib:/opt/gridengine/lib/linux-x64:/opt/gridengine/lib/linux-x64:/opt/openmpi/lib:/opt/python/lib:/share/apps/mr/cuda/lib:/share/apps/mr/cuda/lib64:/share/apps/mr/cuda/lib:/share/apps/mr/cuda/lib64' \
   ~/utils/libc6_2.17/lib/x86_64-linux-gnu/ld-2.17.so /share/apps/mr/bin/python3 \
-                ./src/train_extra.py \
+                ./train_extra.py \
                 --model "AdaptiveIAAModel" \
                 --data "./snli_1.0" \
-                --weights_dir "./out/grid_outputs/${timestamp}/grid_output" \
+                --weights_dir "./out/grid_outputs/${timestamp}/grid_output/${name}" \
                 --vocab_path "./snli_1.0/unbounded_vocab.txt" \
                 --embedding_path "../glove/glove.6B.300d.txt" \
                 --verbose True \
