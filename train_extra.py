@@ -149,7 +149,7 @@ def main(unused_args):
 
                 if config.use_embeddings:
                     session.run([models[0].embedding_init],feed_dict={models[0].embedding_placeholder:embedding_var})
-
+                    del embedding_var
 
                         #### Reload Model ####
                 if saved_model_path is not None:
