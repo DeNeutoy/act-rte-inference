@@ -84,7 +84,7 @@ def main(unused_args):
 
     MODEL, _ = get_config_and_model(args.model)
 
-    stats_from_training = pickle.load(open(weights_dir + "/Stats.pkl", "rb"))
+    stats_from_training = pickle.load(open(weights_dir + "/stats.pkl", "rb"))
     eval_config = stats_from_training["eval_config"][0]
 
     saved_model_path = stats_from_training['test_file'][0]
@@ -148,7 +148,7 @@ def main(unused_args):
                     if saved_model_path is not None:
 
                         v_dic = {v.name: v for v in tf.trainable_variables()}
-                        loaded_weights = pickle.load(open(saved_model_path, "rb"))
+                        loaded_weights = pickle.load(open(os.path.join(weights_dir,saved_model_path), "rb"))
 
                         for key, value in loaded_weights.items():
 
