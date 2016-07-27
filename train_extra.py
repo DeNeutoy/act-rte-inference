@@ -181,11 +181,11 @@ def main(unused_args):
                 trainingStats["val_acc"].append(valid_acc)
                 trainingStats["epoch"].append(i)
 
-                if trainingStats["val_acc"][i-1] >= trainingStats["val_acc"][i]:
-                    print("decaying learning rate")
-                    trainingStats["lr_decay"].append(i)
-                    current_lr = session.run(models[0].lr)
-                    session.run(tf.assign(models[0].lr, config.lr_decay * current_lr))
+                # if trainingStats["val_acc"][i-1] >= trainingStats["val_acc"][i]:
+                #     print("decaying learning rate")
+                #     trainingStats["lr_decay"].append(i)
+                #     current_lr = session.run(models[0].lr)
+                #     session.run(tf.assign(models[0].lr, config.lr_decay * current_lr))
 
                 print("Epoch: {} Train Loss: {} Train Acc: {}".format(i + 1, train_loss, train_acc))
                 print("Epoch: {} Valid Loss: {} Valid Acc: {}".format(i + 1, valid_loss, valid_acc))
@@ -193,10 +193,16 @@ def main(unused_args):
                 #######    Model Hooks    ########
                 if weights_dir is not None:
                     date = "{:%m.%d.%H.%M}".format(datetime.now())
-                    saveload.main(weights_dir + "/Epoch_{:02}Train_{:0.3f}Val_{:0.3f}date{}.pkl"
-                                  .format(i+1,train_acc,valid_acc, date), session)
-
+                    file ="/Epoch_{:02}Train_{:0.3f}Val_{:0.3f}date{}.pkl".format(i+1,train_acc,valid_acc, date)
+                    saveload.main(weights_dir + file, session)
+                    trainingStats["epoch_files"].append(file)
                     pickle.dump(trainingStats,open(os.path.join(weights_dir, "stats.pkl"), "wb"))
+
+            # load weights with best validation performance:
+
+            best_epoch = np.argmax(trainingStats["val_acc"])
+            file = trainingStats["epoch_files"][best_epoch]
+            saveload.main(weights_dir + file, session)
 
             test_loss, test_acc, test_mean, test_var = extra_epoch(session, models_test, test_buckets, training=False)
             date = "{:%m.%d.%H.%M}".format(datetime.now())
@@ -205,9 +211,9 @@ def main(unused_args):
             trainingStats["test_acc"].append(test_acc)
             trainingStats["test_step_mean"].append(test_mean)
             trainingStats["test_step_var"].append(test_var)
-
-            saveload.main(weights_dir + "/FinalTestAcc_{:0.5f}date{}.pkl"
-                                  .format(test_acc, date), session)
+            file = "/BestEpoch_{}FinalTestAcc_{:0.5f}date{}.pkl".format(best_epoch,test_acc, date)
+            trainingStats["test_file"].append(file)
+            saveload.main(weights_dir + file, session)
 
             pickle.dump(trainingStats,open(os.path.join(weights_dir, "stats.pkl"), "wb"))
 

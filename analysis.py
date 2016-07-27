@@ -43,12 +43,13 @@ def analysis_epoch(session, models, data, vocab):
                                       m.targets: y})
 
         stats = {}
-        stats["act_probs"] = probs.squeeze()
+        stats["act_probs"] = probs.squeeze(1)
         stats["premise"] = vocab.tokens_for_ids(x["premise"].squeeze().tolist())
-        stats["premise_attention"] = prem.squeeze()
+        stats["premise_attention"] = prem.squeeze(1)
         stats["hypothesis"] = vocab.tokens_for_ids(x["hypothesis"].squeeze().tolist())
-        stats["hypothesis_attention"] = hyp.squeeze()
+        stats["hypothesis_attention"] = hyp.squeeze(1)
         stats["correct"] = batch_acc
+        stats["class"] = np.argmax(y.squeeze())
         return_data.append(stats)
 
         costs += cost
@@ -76,16 +77,17 @@ def get_config_and_model(conf):
         return  AdaptiveReader, CONFIG.IAAConfig()
 
 def main(unused_args):
-    saved_model_path = args.model_path
     vocab_path = args.vocab_path
     weights_dir = args.weights_dir
     verbose = args.verbose
     debug = args.debug
-    embeddings = args.embedding_path
 
-    MODEL, eval_config = get_config_and_model(args.model)
+    MODEL, _ = get_config_and_model(args.model)
 
+    stats_from_training = pickle.load(open(weights_dir + "/Stats.pkl", "rb"))
+    eval_config = stats_from_training["eval_config"][0]
 
+    saved_model_path = stats_from_training['test_file'][0]
 
     if weights_dir is not None:
         if not os.path.exists(weights_dir):
@@ -93,8 +95,6 @@ def main(unused_args):
 
     vocab = Vocab(vocab_path, args.data_path,max_vocab_size=40000)
 
-    eval_config.vocab_size = vocab.size()
-    eval_config.vocab_size = vocab.size()
     eval_config.batch_size = 1
 
     train, val, test = "snli_1.0_train.jsonl","snli_1.0_dev.jsonl","snli_1.0_test.jsonl"
@@ -108,7 +108,7 @@ def main(unused_args):
     if debug:
         buckets = [(15,10)]
         raw_data = snli_reader.load_data(args.data_path,train, val, test, vocab, False,
-                            max_records=10,buckets=buckets, batch_size=eval_config.batch_size)
+                            max_records=1000,buckets=buckets, batch_size=eval_config.batch_size)
     else:
         buckets = [(10,5),(20,10),(30,20),(40,30),(50,40),(82,62)]
         raw_data = snli_reader.load_data(args.data_path,train, val, test, vocab, False,
@@ -120,21 +120,7 @@ def main(unused_args):
 
 
     if eval_config.use_embeddings:
-        print("loading embeddings from {}".format(embeddings))
-        vocab_dict = import_embeddings(embeddings)
-
-        eval_config.embedding_size = len(vocab_dict["the"])
-        eval_config.embedding_size = eval_config.embedding_size
-
         embedding_var = np.random.normal(0.0, eval_config.init_scale, [eval_config.vocab_size, eval_config.embedding_size])
-        no_embeddings = 0
-        for word in vocab.token_id.keys():
-            try:
-                embedding_var[vocab.token_id[word],:] = vocab_dict[word]
-            except KeyError:
-                no_embeddings +=1
-                continue
-        print("num embeddings with no value:{}".format(no_embeddings))
     else:
         embedding_var = None
 
@@ -169,14 +155,12 @@ def main(unused_args):
                             session.run(tf.assign(v_dic[key], value))
 
             test_loss, test_acc, processed_data = analysis_epoch(session, models_test, test_buckets,vocab)
-            date = "{:%m.%d.%H.%M}".format(datetime.now())
 
             trainingStats["test_loss"].append(test_loss)
             trainingStats["test_acc"].append(test_acc)
             print("Test Accuracy:", test_acc)
             print("Test Loss:", test_loss)
-            saveload.main(weights_dir + "/FinalTestAcc_{:0.5f}date{}.pkl"
-                                  .format(test_acc, date), session)
+
             pickle.dump(processed_data, open(os.path.join(weights_dir, "processed_data.pkl"), "wb"))
             if verbose:
                 print("Test Accuracy: {}".format(test_acc))
@@ -188,12 +172,10 @@ if __name__ == '__main__':
 
     parser.add_argument("--model")
     parser.add_argument("--data_path")
-    parser.add_argument("--model_path")
     parser.add_argument("--weights_dir")
     parser.add_argument("--verbose")
     parser.add_argument("--debug", action='store_true', default=False)
     parser.add_argument("--vocab_path")
-    parser.add_argument("--embedding_path")
 
     from sys import argv
 
