@@ -148,7 +148,7 @@ def main(unused_args):
                     if saved_model_path is not None:
 
                         v_dic = {v.name: v for v in tf.trainable_variables()}
-                        loaded_weights = pickle.load(open(os.path.join(weights_dir,saved_model_path), "rb"))
+                        loaded_weights = pickle.load(open(weights_dir + saved_model_path, "rb"))
 
                         for key, value in loaded_weights.items():
 
