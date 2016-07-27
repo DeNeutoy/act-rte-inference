@@ -5,6 +5,7 @@ from __future__ import division
 from __future__ import print_function
 
 import os
+from os.path import normpath, basename
 import pickle
 from datetime import datetime
 import config as CONFIG
@@ -161,7 +162,8 @@ def main(unused_args):
             print("Test Accuracy:", test_acc)
             print("Test Loss:", test_loss)
 
-            pickle.dump(processed_data, open(os.path.join(weights_dir, "processed_data.pkl"), "wb"))
+            param_path = basename(normpath(weights_dir))
+            pickle.dump([eval_config,processed_data], open(os.path.join(weights_dir, param_path + "_config_processed_data.pkl"), "wb"))
             if verbose:
                 print("Test Accuracy: {}".format(test_acc))
 
