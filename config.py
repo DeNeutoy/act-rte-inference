@@ -69,8 +69,8 @@ class AdaptiveIAAConfig(object):
   num_layers = 2
   num_steps = 20
   encoder_size = 128
-  inference_size = 512
-  hidden_size = 384
+  inference_size = 256
+  hidden_size = 128
   max_epoch = 4
   max_max_epoch = 16
   keep_prob = 0.8

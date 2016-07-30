@@ -224,7 +224,7 @@ class AdaptiveIAAModel(object):
 
             remainder = tf.constant(1.0, tf.float32,[self.batch_size]) - prob
             remainder_expanded = tf.expand_dims(remainder,1)
-            tiled_remainder = tf.tile(remainder_expanded,[1,self.config.encoder_size*4])
+            tiled_remainder = tf.tile(remainder_expanded,[1,self.config.inference_size])
 
             acc_state = (new_state * tiled_remainder) + acc_states
             return acc_state
@@ -232,7 +232,7 @@ class AdaptiveIAAModel(object):
         def normal():
 
             p_expanded = tf.expand_dims(p * new_float_mask,1)
-            tiled_p = tf.tile(p_expanded,[1,self.config.encoder_size*4])
+            tiled_p = tf.tile(p_expanded,[1,self.config.inference_size])
 
             acc_state = (new_state * tiled_p) + acc_states
             return acc_state

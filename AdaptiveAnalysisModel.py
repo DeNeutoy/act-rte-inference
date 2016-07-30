@@ -238,7 +238,7 @@ class AdaptiveAnalysisModel(object):
 
             remainder = tf.constant(1.0, tf.float32,[self.batch_size]) - prob
             remainder_expanded = tf.expand_dims(remainder,1)
-            tiled_remainder = tf.tile(remainder_expanded,[1,self.config.encoder_size*4])
+            tiled_remainder = tf.tile(remainder_expanded,[1,self.config.inference_size])
 
             ap = array_probs.write(i, remainder)
             ha= hypothesis_attention.write(i, hyp_weights)
@@ -249,7 +249,7 @@ class AdaptiveAnalysisModel(object):
         def normal():
 
             p_expanded = tf.expand_dims(p * new_float_mask,1)
-            tiled_p = tf.tile(p_expanded,[1,self.config.encoder_size*4])
+            tiled_p = tf.tile(p_expanded,[1,self.config.inference_size])
 
             ap= array_probs.write(i, p*new_float_mask)
             pa = premise_attention.write(i, prem_weights)
