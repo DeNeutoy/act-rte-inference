@@ -28,7 +28,8 @@ def run_epoch(session, models, data, training, verbose=False):
     first_acc = 0.0
     epoch_size, id_to_data = bucket_shuffle(data)
 
-    for step, (id,(x, y)) in enumerate(id_to_data):
+    for step in range(epoch_size):
+        (id,(x, y)) = next(id_to_data)
         m = models[id]
         assert x["premise"].shape == (m.premise.get_shape())
         assert x["hypothesis"].shape == (m.hypothesis.get_shape())
@@ -66,7 +67,8 @@ def extra_epoch(session, models, data, training, verbose=False):
     var_steps = 0.0
     epoch_size, id_to_data = bucket_shuffle(data)
 
-    for step, (id,(x, y)) in enumerate(id_to_data):
+    for step in range(epoch_size):
+        (id,(x, y)) = next(id_to_data)
         m = models[id]
         assert x["premise"].shape == (m.premise.get_shape())
         assert x["hypothesis"].shape == (m.hypothesis.get_shape())
