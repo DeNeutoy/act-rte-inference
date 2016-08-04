@@ -5,7 +5,7 @@ from itertools import chain
 import tensorflow as tf
 import threading
 from queue import Queue
-from memory_profiler import profile
+
 
 
 def bucket_shuffle(dict_data):
@@ -58,7 +58,6 @@ def run_epoch(session, models, data, training, verbose=False):
 
     return (costs / iters), (accuracy / iters)
 
-@profile
 def extra_epoch(session, models, data, training, verbose=False):
     """Runs the model on the given data."""
     start_time = time.time()
@@ -76,6 +75,7 @@ def extra_epoch(session, models, data, training, verbose=False):
 
         if training:
             eval_op = m.train_op
+
 
             batch_acc, cost,act_steps, _ = session.run([m.accuracy, m.cost, m.iterations, eval_op], feed_dict={m.premise: x["premise"],
                                       m.hypothesis: x["hypothesis"],
@@ -100,7 +100,7 @@ def extra_epoch(session, models, data, training, verbose=False):
                iters * m.batch_size / (time.time() - start_time)))
 
     variance = var_steps/(iters*m.batch_size) - np.square(avg_steps/(iters*m.batch_size))
-    return (costs / iters), (accuracy / iters), (avg_steps/iters*m.batch_size), variance
+    return (costs / iters), (accuracy / iters), (avg_steps/(iters*m.batch_size)), variance
 
 
 
