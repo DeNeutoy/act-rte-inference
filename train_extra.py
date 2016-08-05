@@ -19,7 +19,7 @@ import saveload
 import argparse
 import numpy as np
 from collections import defaultdict
-
+from memory_profiler import profile
 def get_config_and_model(conf):
 
     if conf == "DAModel":
@@ -30,7 +30,7 @@ def get_config_and_model(conf):
         return AdaptiveIAAModel, CONFIG.AdaptiveIAAConfig()
     elif conf == "AdaptiveReader":
         return  AdaptiveReader, CONFIG.IAAConfig()
-
+@profile
 def main(unused_args):
     saved_model_path = args.model_path
     vocab_path = args.vocab_path
@@ -79,7 +79,7 @@ def main(unused_args):
     if debug:
         buckets = [(15,10)]
         raw_data = snli_reader.load_data(args.data_path,train, val, test, vocab, False,
-                            max_records=100,buckets=buckets, batch_size=config.batch_size)
+                            max_records=10,buckets=buckets, batch_size=config.batch_size)
     else:
         buckets = [(10,5),(20,10),(30,20),(40,30),(50,40),(82,62)]
         raw_data = snli_reader.load_data(args.data_path,train, val, test, vocab, False,
@@ -120,6 +120,7 @@ def main(unused_args):
     trainingStats = defaultdict(list)
     trainingStats["config"].append(config)
     trainingStats["eval_config"].append(eval_config)
+
     with tf.Graph().as_default(), tf.Session() as session:
         initialiser = tf.random_uniform_initializer(-config.init_scale, config.init_scale)
 
@@ -162,7 +163,10 @@ def main(unused_args):
             epochs = [i for i in range(config.max_max_epoch)]
             epochs = epochs[len(trainingStats["epoch"]):]
             print("beginning training")
-
+            print(epochs)
+            with open(weights_dir + "/text_summary.txt", "a+") as summary:
+                summary.write(" ".join(["Epoch", "Train", "Val","Date", "\n"]))
+            #tf.get_default_graph().finalize()
             for i in epochs:
                 #lr_decay = config.lr_decay ** max(i - config.max_epoch, 0.0)
                 #session.run(tf.assign(m[model].lr, config.learning_rate * lr_decay))
@@ -191,18 +195,25 @@ def main(unused_args):
                 print("Epoch: {} Valid Loss: {} Valid Acc: {}".format(i + 1, valid_loss, valid_acc))
 
                 #######    Model Hooks    ########
-                if weights_dir is not None:
+                if weights_dir is not None and (trainingStats["val_acc"][i-1] <= valid_acc):
                     date = "{:%m.%d.%H.%M}".format(datetime.now())
-                    file ="/Epoch_{:02}Train_{:0.3f}Val_{:0.3f}date{}.pkl".format(i+1,train_acc,valid_acc, date)
-                    saveload.main(weights_dir + file, session)
-                    trainingStats["epoch_files"].append(file)
-                    pickle.dump(trainingStats,open(os.path.join(weights_dir, "stats.pkl"), "wb"))
+
+                    with open(weights_dir + "/text_summary.txt", "a+") as summary:
+                        summary.write(" ".join([str(i+1),str(train_acc), str(valid_acc), date, "\n"]))
+
+                    with open(weights_dir + "/weights.pkl", "wb") as file:
+                        variables = tf.trainable_variables()
+                        values = session.run(variables)
+                        pickle.dump({var.name: val for var, val in zip(variables, values)}, file)
+
+
+                pickle.dump(trainingStats,open(os.path.join(weights_dir, "stats.pkl"), "wb"))
 
             # load weights with best validation performance:
-
             best_epoch = np.argmax(trainingStats["val_acc"])
-            file = trainingStats["epoch_files"][best_epoch]
-            saveload.main(weights_dir + file, session)
+            v_dic = {v.name: v for v in tf.trainable_variables()}
+            for key, value in pickle.load(open(weights_dir + "/weights.pkl", "rb")).items():
+                session.run(tf.assign(v_dic[key], value))
 
             test_loss, test_acc, test_mean, test_var = extra_epoch(session, models_test, test_buckets, training=False)
             date = "{:%m.%d.%H.%M}".format(datetime.now())
@@ -211,9 +222,11 @@ def main(unused_args):
             trainingStats["test_acc"].append(test_acc)
             trainingStats["test_step_mean"].append(test_mean)
             trainingStats["test_step_var"].append(test_var)
-            file = "/BestEpoch_{}FinalTestAcc_{:0.5f}date{}.pkl".format(best_epoch,test_acc, date)
-            trainingStats["test_file"].append(file)
-            saveload.main(weights_dir + file, session)
+            file = "/BestEpoch_{}FinalTestAcc_{:0.5f}date{}.txt".format(best_epoch,test_acc, date)
+            trainingStats["test_file"].append("/weights.pkl")
+
+            with open(weights_dir + file, "a+") as test_file:
+                test_file.write(" ".join([str(best_epoch), str(test_acc), str(date), "\n"]))
 
             pickle.dump(trainingStats,open(os.path.join(weights_dir, "stats.pkl"), "wb"))
 
