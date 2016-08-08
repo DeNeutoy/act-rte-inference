@@ -13,13 +13,14 @@ from Vocab import Vocab
 from IAAModel import IAAModel
 from DAModel import DAModel
 from AdaptiveIAAModel import AdaptiveIAAModel
-from AdaptiveReader import AdaptiveReader
+from ACTAttentionModel import ACTAttentionModel
 from embedding_utils import import_embeddings
 import saveload
 import argparse
 import numpy as np
 from collections import defaultdict
-from memory_profiler import profile
+
+
 def get_config_and_model(conf):
 
     if conf == "DAModel":
@@ -28,9 +29,10 @@ def get_config_and_model(conf):
         return IAAModel, CONFIG.IAAConfig()
     elif conf == "AdaptiveIAAModel":
         return AdaptiveIAAModel, CONFIG.AdaptiveIAAConfig()
-    elif conf == "AdaptiveReader":
-        return  AdaptiveReader, CONFIG.IAAConfig()
-@profile
+    elif conf == "ACTAttentionModel":
+        return ACTAttentionModel, CONFIG.ACTAttentionConfig()
+
+
 def main(unused_args):
     saved_model_path = args.model_path
     vocab_path = args.vocab_path
@@ -79,7 +81,7 @@ def main(unused_args):
     if debug:
         buckets = [(15,10)]
         raw_data = snli_reader.load_data(args.data_path,train, val, test, vocab, False,
-                            max_records=10,buckets=buckets, batch_size=config.batch_size)
+                            max_records=1000,buckets=buckets, batch_size=config.batch_size)
     else:
         buckets = [(10,5),(20,10),(30,20),(40,30),(50,40),(82,62)]
         raw_data = snli_reader.load_data(args.data_path,train, val, test, vocab, False,

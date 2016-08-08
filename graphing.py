@@ -19,9 +19,15 @@ def load_stats(directory):
 
 
     all_statistics = []
+    best_test_acc = ("", 0.0, 0.0)
     for file in os.listdir(directory):
+        stats = pickle.load(open(os.path.join(directory,file), "rb"))
+        all_statistics.append(stats)
+        if np.max(stats["val_acc"]) > best_test_acc[1]:
+            best_test_acc = (file, np.max(stats["val_acc"]), stats["test_acc"])
 
-        all_statistics.append(pickle.load(open(os.path.join(directory,file), "rb")))
+    print("Best Val Acc: ", best_test_acc[1], "Test Acc: ", best_test_acc[2])
+    print("Filename: ", best_test_acc[0])
 
     return all_statistics
 
@@ -37,29 +43,37 @@ def load_proccesed_data(directory):
 
 
 
-def single_mean_with_variance(stats, title, train=True):
+def single_mean_with_variance(stats, title, save=False):
 
     """ Plot the mean number of ACT steps for a single run
     with variance bounds above and below   """
-
+    labels = ["Training Set", "Validation Set"]
+    datasets = [("train_step_mean", "train_step_var"),("val_step_mean", "val_step_var")]
+    leg = []
     fig = plt.figure()
+    colours = cm.rainbow(np.linspace(0,1,2))
+
+    for key, label, color in zip(datasets, labels, colours):
+        means = np.array(stats[key[0]]) + 1.0
+        vars = np.array(stats[key[1]])
+
+        plotted, =plt.plot(stats["epoch"],means, label=label, color=color)
+        leg.append(plotted)
+        upper = means + np.sqrt(vars)
+        lower = means - np.sqrt(vars)
+        plt.fill_between(stats["epoch"],lower, upper, alpha=0.3, color=color)
+
+    plt.legend(handles=leg)
+
     ax = plt.gca()
-
-    if train:
-        means = np.array(stats["train_step_mean"])/200
-        vars = np.array(stats["train_step_var"])
+    ax.set_title(title + ": Step Penalty = " + str(stats["config"][0].step_penalty))
+    ax.set_xlabel("Epoch")
+    ax.set_ylabel("Mean ACT Steps")
+    ax.set_ylim([1,6])
+    if save:
+        plt.savefig("mean_and_variance" + str(stats["config"][0].step_penalty) +".png" )
     else:
-        means = np.array(stats["val_step_mean"])
-        vars = np.array(stats["val_step_var"])
-
-    plt.plot(stats["epoch"],means)
-    upper = means + vars
-    lower = means - vars
-
-
-    plt.fill_between(stats["epoch"],lower, upper, alpha=0.3)
-
-    plt.show()
+        plt.show()
 
 def mean_average_steps(all_loaded_stats, title):
 
@@ -75,7 +89,7 @@ def mean_average_steps(all_loaded_stats, title):
     for run in all_loaded_stats:
 
         c = colours[step_params.index(run["config"][0].step_penalty)]
-        data = np.array(run["val_acc"])
+        data = np.array(run["val_step_mean"]) + 1.0                 #TODO: fix this
         plt.plot(run["epoch"], data ,color=c ,alpha=0.2)
         mean_dict[run["config"][0].step_penalty].append(data)
 
@@ -165,13 +179,24 @@ def sentence_length_vs_ponder_time(config,processed_data):
 if __name__=="__main__":
 
     stats_path = "/Users/markneumann/Documents/Machine_Learning/" \
-                "act-rte-inference/weights/all_stats/stats"
+                "act-rte-inference/weights/all_stats/full_run_stats"
     processed_data_path = "/Users/markneumann/Documents/Machine_Learning/" \
-                "act-rte-inference/weights/all_stats/processed_data"
+                "act-rte-inference/weights/all_stats/full_run_data"
 
+    best_stats_path = "/Users/markneumann/Documents/Machine_Learning/act-rte-inference/weights/" \
+                      "all_stats/AIAA_lr_0.0001hid_256drop_0.8eps_0.01step_pen_0.01_stats.pkl"
+
+    best_stats = pickle.load(open(best_stats_path, "rb"))
     loaded_stats = load_stats(stats_path)
-    loaded_processed_data = load_proccesed_data(processed_data_path)
+    #loaded_processed_data = load_proccesed_data(processed_data_path)
     #mean_average_steps(loaded_stats, "test_title")
     #avg_acc_per_class_wrt_ponder_cost(loaded_processed_data)
-    sentence_length_vs_ponder_time(*loaded_processed_data[4])
-    #single_mean_with_variance(loaded_stats[0], "", train=True)
+    #sentence_length_vs_ponder_time(*loaded_processed_data[1])
+
+    filtered_stats = [stat for stat in loaded_stats if
+                      (stat["config"][0].hidden_size==256 and
+                       stat["config"][0].learning_rate==0.0001 and
+                       stat["config"][0].keep_prob==0.6)]
+
+    for stat in filtered_stats:
+        single_mean_with_variance(stat, "Mean(+/- SD) Number of ACT Steps per Epoch", save=True)

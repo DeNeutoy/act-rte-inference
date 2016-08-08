@@ -16,7 +16,7 @@ from Vocab import Vocab
 from IAAModel import IAAModel
 from DAModel import DAModel
 from AdaptiveAnalysisModel import AdaptiveAnalysisModel
-from AdaptiveReader import AdaptiveReader
+from ACTAttnAnalysisModel import ActAttnAnalysisModel
 from embedding_utils import import_embeddings
 import saveload
 import argparse
@@ -74,8 +74,8 @@ def get_config_and_model(conf):
         return IAAModel, CONFIG.IAAConfig()
     elif conf == "AdaptiveIAAModel":
         return AdaptiveAnalysisModel, CONFIG.AdaptiveIAAConfig()
-    elif conf == "AdaptiveReader":
-        return  AdaptiveReader, CONFIG.IAAConfig()
+    elif conf == "ACTAttentionModel":
+        return ActAttnAnalysisModel, CONFIG.ACTAttentionConfig()
 
 def main(unused_args):
     vocab_path = args.vocab_path

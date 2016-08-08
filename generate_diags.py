@@ -15,9 +15,8 @@ def convert_to_dataframe(data):
     hyp = pd.DataFrame(data["hypothesis_attention"]/hyp_max, columns=data["hypothesis"])
 
     return prem, hyp
-with open("/Users/markneumann/Documents/Machine_Learning/act-rte-inference/weights/processed_data_test.pkl", "rb") as file:
-
-    data = pickle.load(file)
+with open("/Users/markneumann/Documents/Machine_Learning/act-rte-inference/weights/weights_config_processed_data.pkl", "rb") as file:
+    config, data = pickle.load(file)
 
 for i in range(len(data)):
 
@@ -28,24 +27,24 @@ for i in range(len(data)):
     # 4, good for concentration
     # 56 GREAT - co-reference resolution
 
-    if i in [235, 56, 3454, 3565]:
-        print(i,len(data[i]["premise_attention"]), len(data[i]["hypothesis_attention"]))
-        print(data[i])
 
-        fig= plt.figure()
-        axs = gs.GridSpec(2,15)
-        prem, hyp = convert_to_dataframe(data[i])
-        max_val = max(prem.values.max(), hyp.values.max())
-        max_dist = max(data[i]["act_probs"])
-        ax = fig.add_subplot(axs[0,0:13])
-        ax.set_title("Hypothesis")
-        seaborn.heatmap(hyp, vmin=0.0, vmax=1.0)
+    print(i,len(data[i]["premise_attention"]), len(data[i]["hypothesis_attention"]))
+    print(data[i])
 
-        ax = fig.add_subplot(axs[1,0:13])
-        ax.set_title("Premise")
-        seaborn.heatmap(prem, vmin=0.0, vmax=1.0)
-        ax = fig.add_subplot(axs[:,14])
-        ax.set_title("ACT halting probs(weights)")
-        seaborn.heatmap(np.expand_dims(data[i]["act_probs"],1),annot=True)
-        plt.gca()
-        plt.show()
+    fig= plt.figure()
+    axs = gs.GridSpec(2,15)
+    prem, hyp = convert_to_dataframe(data[i])
+    max_val = max(prem.values.max(), hyp.values.max())
+    max_dist = max(data[i]["act_probs"])
+    ax = fig.add_subplot(axs[0,0:13])
+    ax.set_title("Hypothesis")
+    seaborn.heatmap(hyp, vmin=0.0, vmax=1.0)
+
+    ax = fig.add_subplot(axs[1,0:13])
+    ax.set_title("Premise")
+    seaborn.heatmap(prem, vmin=0.0, vmax=1.0)
+    ax = fig.add_subplot(axs[:,14])
+    ax.set_title("ACT halting probs(weights)")
+    seaborn.heatmap(np.expand_dims(data[i]["act_probs"],1),annot=True)
+    plt.gca()
+    plt.show()
