@@ -38,6 +38,12 @@ class ActAttnAnalysisModel(object):
         premise_inputs = tf.nn.embedding_lookup(embedding, self.premise)
         hypothesis_inputs = tf.nn.embedding_lookup(embedding, self.hypothesis)
 
+        if pretrained_embeddings is not None:
+            with tf.variable_scope("input_projection"):
+                premise_inputs = input_projection3D(premise_inputs, self.hidden_size)
+            with tf.variable_scope("input_projection", reuse=True):
+                hypothesis_inputs = input_projection3D(hypothesis_inputs, self.hidden_size)
+
         if self.config.no_cell:
             hyp_outputs = hypothesis_inputs
             premise_outputs = premise_inputs
