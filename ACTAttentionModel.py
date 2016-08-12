@@ -97,7 +97,7 @@ class ACTAttentionModel(object):
         #remainder = tf.Print(remainder, [remainder], message="Remainder: ", summarize=20)
         # softmax over outputs to generate distribution over [neutral, entailment, contradiction]
 
-        softmax_w = tf.get_variable("softmax_w", [2*self.hidden_size, 3])
+        softmax_w = tf.get_variable("softmax_w", [2*self.rep_size, 3])
         softmax_b = tf.get_variable("softmax_b", [3])
         self.logits = tf.matmul(prediction, softmax_w) + softmax_b   # dim (batch_size, 3)
 
@@ -159,6 +159,8 @@ class ACTAttentionModel(object):
     def do_act_steps(self, premise, hypothesis):
 
 
+        self.rep_size = premise.get_shape()[-1].value
+
         self.one_minus_eps = tf.constant(1.0 - self.config.eps, tf.float32,[self.batch_size])
         self.N = tf.constant(self.config.max_computation, tf.float32,[self.batch_size])
 
@@ -166,8 +168,8 @@ class ACTAttentionModel(object):
         prob = tf.constant(0.0,tf.float32,[self.batch_size], name="prob")
         prob_compare = tf.constant(0.0,tf.float32,[self.batch_size], name="prob_compare")
         counter = tf.constant(0.0, tf.float32,[self.batch_size], name="counter")
-        initial_state = tf.zeros([self.batch_size, 2*self.hidden_size], tf.float32, name="state")
-        acc_states = tf.zeros([self.batch_size,2*self.hidden_size], tf.float32, name="state_accumulator")
+        initial_state = tf.zeros([self.batch_size, 2*self.rep_size], tf.float32, name="state")
+        acc_states = tf.zeros([self.batch_size,2*self.rep_size], tf.float32, name="state_accumulator")
         batch_mask = tf.constant(True, tf.bool,[self.batch_size])
 
         # While loop stops when this predicate is FALSE.
@@ -213,7 +215,7 @@ class ACTAttentionModel(object):
 
             remainder = tf.constant(1.0, tf.float32,[self.batch_size]) - prob
             remainder_expanded = tf.expand_dims(remainder,1)
-            tiled_remainder = tf.tile(remainder_expanded,[1,2*self.hidden_size])
+            tiled_remainder = tf.tile(remainder_expanded,[1,2*self.rep_size])
 
             acc_state = (new_state * tiled_remainder) + acc_states
             return acc_state
@@ -221,7 +223,7 @@ class ACTAttentionModel(object):
         def normal():
 
             p_expanded = tf.expand_dims(p * new_float_mask,1)
-            tiled_p = tf.tile(p_expanded,[1,2*self.hidden_size])
+            tiled_p = tf.tile(p_expanded,[1,2*self.rep_size])
 
             acc_state = (new_state * tiled_p) + acc_states
             return acc_state

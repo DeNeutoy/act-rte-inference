@@ -97,7 +97,7 @@ class ActAttnAnalysisModel(object):
         #remainder = tf.Print(remainder, [remainder], message="Remainder: ", summarize=20)
         # softmax over outputs to generate distribution over [neutral, entailment, contradiction]
 
-        softmax_w = tf.get_variable("softmax_w", [2*self.hidden_size, 3])
+        softmax_w = tf.get_variable("softmax_w", [2*self.rep_size, 3])
         softmax_b = tf.get_variable("softmax_b", [3])
         self.logits = tf.matmul(prediction, softmax_w) + softmax_b   # dim (batch_size, 3)
 
@@ -158,6 +158,7 @@ class ActAttnAnalysisModel(object):
 
     def do_act_steps(self, premise, hypothesis):
 
+        self.rep_size = premise.get_shape()[-1].value
 
         self.one_minus_eps = tf.constant(1.0 - self.config.eps, tf.float32,[self.batch_size])
         self.N = tf.constant(self.config.max_computation, tf.float32,[self.batch_size])
@@ -166,7 +167,7 @@ class ActAttnAnalysisModel(object):
         prob = tf.constant(0.0,tf.float32,[self.batch_size], name="prob")
         prob_compare = tf.constant(0.0,tf.float32,[self.batch_size], name="prob_compare")
         counter = tf.constant(0.0, tf.float32,[self.batch_size], name="counter")
-        initial_state = tf.zeros([self.batch_size, 2*self.hidden_size], tf.float32, name="state")
+        initial_state = tf.zeros([self.batch_size, 2*self.rep_size], tf.float32, name="state")
         i = tf.constant(0, tf.int32, name="index")
         acc_states = tf.zeros_like(initial_state, tf.float32, name="state_accumulator")
         batch_mask = tf.constant(True, tf.bool,[self.batch_size])
@@ -229,7 +230,7 @@ class ActAttnAnalysisModel(object):
 
             remainder = tf.constant(1.0, tf.float32,[self.batch_size]) - prob
             remainder_expanded = tf.expand_dims(remainder,1)
-            tiled_remainder = tf.tile(remainder_expanded,[1,2*self.hidden_size])
+            tiled_remainder = tf.tile(remainder_expanded,[1,2*self.rep_size])
 
             ap = array_probs.write(i, remainder)
             ha= hypothesis_attention.write(i, hyp_weights)
@@ -240,7 +241,7 @@ class ActAttnAnalysisModel(object):
         def normal():
 
             p_expanded = tf.expand_dims(p * new_float_mask,1)
-            tiled_p = tf.tile(p_expanded,[1,2*self.hidden_size])
+            tiled_p = tf.tile(p_expanded,[1,2*self.rep_size])
 
             ap= array_probs.write(i, p*new_float_mask)
             pa = premise_attention.write(i, prem_weights)
