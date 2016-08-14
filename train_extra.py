@@ -14,11 +14,13 @@ from IAAModel import IAAModel
 from DAModel import DAModel
 from AdaptiveIAAModel import AdaptiveIAAModel
 from ACTAttentionModel import ACTAttentionModel
+from ACTDAModel import ACTDAModel
 from embedding_utils import import_embeddings
 import saveload
 import argparse
 import numpy as np
 from collections import defaultdict
+
 
 
 def get_config_and_model(conf):
@@ -31,6 +33,8 @@ def get_config_and_model(conf):
         return AdaptiveIAAModel, CONFIG.AdaptiveIAAConfig()
     elif conf == "ACTAttentionModel":
         return ACTAttentionModel, CONFIG.ACTAttentionConfig()
+    elif conf == "ACTDAModel":
+        return ACTDAModel, CONFIG.ACTDAConfig()
 
 
 def main(unused_args):

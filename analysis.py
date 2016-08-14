@@ -17,6 +17,7 @@ from IAAModel import IAAModel
 from DAModel import DAModel
 from AdaptiveAnalysisModel import AdaptiveAnalysisModel
 from ACTAttnAnalysisModel import ActAttnAnalysisModel
+from ACTDAAnalysisModel import ACTDAAnalysisModel
 from embedding_utils import import_embeddings
 import saveload
 import argparse
@@ -76,6 +77,8 @@ def get_config_and_model(conf):
         return AdaptiveAnalysisModel, CONFIG.AdaptiveIAAConfig()
     elif conf == "ACTAttentionModel":
         return ActAttnAnalysisModel, CONFIG.ACTAttentionConfig()
+    elif conf == "ACTDAModel":
+        return ACTDAAnalysisModel, CONFIG.ACTDAConfig()
 
 def main(unused_args):
     vocab_path = args.vocab_path
