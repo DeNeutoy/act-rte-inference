@@ -38,10 +38,13 @@ def run_epoch(session, models, data, training, verbose=False):
 
         if training:
             eval_op = m.train_op
-        else:
-            eval_op = tf.no_op()
 
-        batch_acc, cost, _ = session.run([m.accuracy, m.cost, eval_op], feed_dict={m.premise: x["premise"],
+            batch_acc, cost, _ = session.run([m.accuracy, m.cost, eval_op], feed_dict={m.premise: x["premise"],
+                                      m.hypothesis: x["hypothesis"],
+                                      m.targets: y})
+        else:
+
+            batch_acc, cost  = session.run([m.accuracy, m.cost], feed_dict={m.premise: x["premise"],
                                       m.hypothesis: x["hypothesis"],
                                       m.targets: y})
 

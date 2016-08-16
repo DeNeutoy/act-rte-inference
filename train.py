@@ -13,11 +13,15 @@ from Vocab import Vocab
 from IAAModel import IAAModel
 from DAModel import DAModel
 from AdaptiveIAAModel import AdaptiveIAAModel
+from ACTAttentionModel import ACTAttentionModel
+from ACTDAModel import ACTDAModel
 from embedding_utils import import_embeddings
 import saveload
 import argparse
 import numpy as np
 from collections import defaultdict
+
+
 
 def get_config_and_model(conf):
 
@@ -27,6 +31,10 @@ def get_config_and_model(conf):
         return IAAModel, CONFIG.IAAConfig()
     elif conf == "AdaptiveIAAModel":
         return AdaptiveIAAModel, CONFIG.AdaptiveIAAConfig()
+    elif conf == "ACTAttentionModel":
+        return ACTAttentionModel, CONFIG.ACTAttentionConfig()
+    elif conf == "ACTDAModel":
+        return ACTDAModel, CONFIG.ACTDAConfig()
 
 
 def main(unused_args):
@@ -46,10 +54,25 @@ def main(unused_args):
         if not os.path.exists(weights_dir):
             os.mkdir(weights_dir)
 
+
+
     vocab = Vocab(vocab_path, args.data_path,max_vocab_size=40000)
 
     config.vocab_size = vocab.size()
     eval_config.vocab_size = vocab.size()
+
+    if args.grid_search:
+
+        config.hidden_size = int(args.hidden_size)
+        config.learning_rate = float(args.learning_rate)
+        config.eps = float(args.eps)
+        config.step_penalty = float(args.step_penalty)
+        config.keep_prob = float(args.keep_prob)
+        eval_config.hidden_size = int(args.hidden_size)
+        eval_config.learning_rate = float(args.learning_rate)
+        eval_config.eps = float(args.eps)
+        eval_config.step_penalty = float(args.step_penalty)
+        eval_config.keep_prob = float(args.keep_prob)
 
     train, val, test = "snli_1.0_train.jsonl","snli_1.0_dev.jsonl","snli_1.0_test.jsonl"
 
@@ -62,7 +85,7 @@ def main(unused_args):
     if debug:
         buckets = [(15,10)]
         raw_data = snli_reader.load_data(args.data_path,train, val, test, vocab, False,
-                            max_records=100,buckets=buckets, batch_size=config.batch_size)
+                            max_records=50,buckets=buckets, batch_size=config.batch_size)
     else:
         buckets = [(10,5),(20,10),(30,20),(40,30),(50,40),(82,62)]
         raw_data = snli_reader.load_data(args.data_path,train, val, test, vocab, False,
@@ -103,6 +126,7 @@ def main(unused_args):
     trainingStats = defaultdict(list)
     trainingStats["config"].append(config)
     trainingStats["eval_config"].append(eval_config)
+
     with tf.Graph().as_default(), tf.Session() as session:
         initialiser = tf.random_uniform_initializer(-config.init_scale, config.init_scale)
 
@@ -128,23 +152,27 @@ def main(unused_args):
                     models_test.append(MODEL(eval_config, pretrained_embeddings=embedding_var,
                                              update_embeddings=config.train_embeddings, is_training=False))
 
-                tf.initialize_all_variables().run()
+            tf.initialize_all_variables().run()
 
-                if config.use_embeddings:
-                    session.run([models[0].embedding_init],feed_dict={models[0].embedding_placeholder:embedding_var})
+            if config.use_embeddings:
+                session.run([models[0].embedding_init],feed_dict={models[0].embedding_placeholder:embedding_var})
+                del embedding_var
 
-                #### Reload Model ####
-                if saved_model_path is not None:
-                    saveload.main(saved_model_path, session)
-                    try:
-                        trainingStats = pickle.load(open(os.path.join(weights_dir,"stats.pkl"), "rb"))
-                    except:
-                        print("unable to rejoin original statistics - ignore if not continuing training.")
+                    #### Reload Model ####
+            if saved_model_path is not None:
+                saveload.main(saved_model_path, session)
+                try:
+                    trainingStats = pickle.load(open(os.path.join(weights_dir,"stats.pkl"), "rb"))
+                except:
+                    print("unable to rejoin original statistics - ignore if not continuing training.")
 
             epochs = [i for i in range(config.max_max_epoch)]
             epochs = epochs[len(trainingStats["epoch"]):]
             print("beginning training")
-
+            print(epochs)
+            with open(weights_dir + "/text_summary.txt", "a+") as summary:
+                summary.write(" ".join(["Epoch", "Train", "Val","Date", "\n"]))
+            #tf.get_default_graph().finalize()
             for i in epochs:
                 #lr_decay = config.lr_decay ** max(i - config.max_epoch, 0.0)
                 #session.run(tf.assign(m[model].lr, config.learning_rate * lr_decay))
@@ -159,30 +187,46 @@ def main(unused_args):
                 trainingStats["val_acc"].append(valid_acc)
                 trainingStats["epoch"].append(i)
 
-                if trainingStats["val_acc"][i-1] >= trainingStats["val_acc"][i]:
-                    print("decaying learning rate")
-                    current_lr = session.run(models[0].lr)
-                    session.run(tf.assign(models[0].lr, config.lr_decay * current_lr))
+                # if trainingStats["val_acc"][i-1] >= trainingStats["val_acc"][i]:
+                #     print("decaying learning rate")
+                #     trainingStats["lr_decay"].append(i)
+                #     current_lr = session.run(models[0].lr)
+                #     session.run(tf.assign(models[0].lr, config.lr_decay * current_lr))
 
                 print("Epoch: {} Train Loss: {} Train Acc: {}".format(i + 1, train_loss, train_acc))
                 print("Epoch: {} Valid Loss: {} Valid Acc: {}".format(i + 1, valid_loss, valid_acc))
 
                 #######    Model Hooks    ########
-                if weights_dir is not None:
+                if weights_dir is not None and (trainingStats["val_acc"][i-1] <= valid_acc):
                     date = "{:%m.%d.%H.%M}".format(datetime.now())
-                    saveload.main(weights_dir + "/Epoch_{:02}Train_{:0.3f}Val_{:0.3f}date{}.pkl"
-                                  .format(i+1,train_acc,valid_acc, date), session)
 
-                    pickle.dump(trainingStats,open(os.path.join(weights_dir, "stats.pkl"), "wb"))
+                    with open(weights_dir + "/text_summary.txt", "a+") as summary:
+                        summary.write(" ".join([str(i+1),str(train_acc), str(valid_acc), date, "\n"]))
+
+                    with open(weights_dir + "/weights.pkl", "wb") as file:
+                        variables = tf.trainable_variables()
+                        values = session.run(variables)
+                        pickle.dump({var.name: val for var, val in zip(variables, values)}, file)
+
+
+                pickle.dump(trainingStats,open(os.path.join(weights_dir, "stats.pkl"), "wb"))
+
+            # load weights with best validation performance:
+            best_epoch = np.argmax(trainingStats["val_acc"])
+            v_dic = {v.name: v for v in tf.trainable_variables()}
+            for key, value in pickle.load(open(weights_dir + "/weights.pkl", "rb")).items():
+                session.run(tf.assign(v_dic[key], value))
 
             test_loss, test_acc = run_epoch(session, models_test, test_buckets, training=False)
             date = "{:%m.%d.%H.%M}".format(datetime.now())
 
             trainingStats["test_loss"].append(test_loss)
             trainingStats["test_acc"].append(test_acc)
+            file = "/BestEpoch_{}FinalTestAcc_{:0.5f}date{}.txt".format(best_epoch,test_acc, date)
+            trainingStats["test_file"].append("/weights.pkl")
 
-            saveload.main(weights_dir + "/FinalTestAcc_{:0.5f}date{}.pkl"
-                                  .format(test_acc, date), session)
+            with open(weights_dir + file, "a+") as test_file:
+                test_file.write(" ".join([str(best_epoch), str(test_acc), str(date), "\n"]))
 
             pickle.dump(trainingStats,open(os.path.join(weights_dir, "stats.pkl"), "wb"))
 
@@ -200,8 +244,15 @@ if __name__ == '__main__':
     parser.add_argument("--weights_dir")
     parser.add_argument("--verbose")
     parser.add_argument("--debug", action='store_true', default=False)
+    parser.add_argument("--grid_search", action='store_true', default=False)
     parser.add_argument("--vocab_path")
     parser.add_argument("--embedding_path")
+    parser.add_argument("--hidden_size", type=int)
+    parser.add_argument("--learning_rate", type=float)
+    parser.add_argument("--eps", type=float)
+    parser.add_argument("--step_penalty", type=float)
+    parser.add_argument("--keep_prob", type=float)
+
 
     from sys import argv
 
