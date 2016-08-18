@@ -26,6 +26,7 @@ class IAAModel(object):
         self.targets = tf.placeholder(tf.int32, [batch_size, 3])
 
 
+
         if pretrained_embeddings is not None:
             embedding = tf.get_variable('embedding', [self.vocab_size, self.config.embedding_size], dtype=tf.float32,
                                         trainable=update_embeddings)
