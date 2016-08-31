@@ -109,7 +109,7 @@ class ACTDAAnalysisModel(object):
         loss = seq2seq.sequence_loss_by_example(
                 [self.logits],
                 [targets],
-                [tf.ones([batch_size])],
+                [tf.ones([self.batch_size])],
                 3)
         self.cost = tf.reduce_mean(loss)
 
@@ -117,6 +117,7 @@ class ACTDAAnalysisModel(object):
 
         self.accuracy = tf.reduce_mean(tf.cast(tf.equal(logit_max_index, targets), tf.float32))
 
+        self.per_step_accs, self.per_step_dists = self.evaluate_representation()
 
         if is_training:
 
@@ -130,6 +131,38 @@ class ACTDAAnalysisModel(object):
             self.train_op = optimizer.apply_gradients(zip(grads, tvars))
 
 
+    def evaluate_representation(self):
+        # note this assumes batch size == 1, normal for analysis.
+        tf.get_variable_scope().reuse_variables()
+        softmax_w = tf.get_variable("softmax_w", [self.config.inference_size, 3])
+        softmax_b = tf.get_variable("softmax_b", [3])
+
+        #per_step_accs = []
+
+        def evaluate(act_step):
+
+            logits = tf.matmul(act_step, softmax_w) + softmax_b
+            #_, targets = tf.nn.top_k(self.targets)
+
+            #_, logit_max_index = tf.nn.top_k(logits)
+            #step_acc = tf.reduce_mean(tf.cast(tf.equal(logit_max_index, targets), tf.float32))
+
+            return tf.nn.softmax(logits)
+
+        def evaluate_acc(act_step):
+
+            logits = tf.matmul(act_step, softmax_w) + softmax_b
+            _, targets = tf.nn.top_k(self.targets)
+
+            _, logit_max_index = tf.nn.top_k(logits)
+            step_acc = tf.reduce_mean(tf.cast(tf.equal(logit_max_index, targets), tf.float32))
+
+            return step_acc
+
+
+        per_step_dists = tf.map_fn(evaluate, self.incremental_states)
+        per_step_accs = tf.map_fn(evaluate_acc, self.incremental_states)
+        return per_step_accs, per_step_dists
 
     def do_inference_steps(self, initial_state, premise, hypothesis):
 
@@ -149,12 +182,13 @@ class ACTDAAnalysisModel(object):
         array_probs = tf.TensorArray(tf.float32,0, dynamic_size=True)
         premise_attention = tf.TensorArray(tf.float32,0, dynamic_size=True)
         hypothesis_attention = tf.TensorArray(tf.float32,0, dynamic_size=True)
+        incremental_states = tf.TensorArray(tf.float32,0, dynamic_size=True)
 
 
         # While loop stops when this predicate is FALSE.
         # Ie all (probability < 1-eps AND counter < N) are false.
 
-        pred = lambda i ,array_probs, premise_attention, hypothesis_attention, batch_mask,prob_compare,prob,\
+        pred = lambda i ,incremental_states, array_probs, premise_attention, hypothesis_attention, batch_mask,prob_compare,prob,\
                       counter,state,premise, hypothesis ,acc_state:\
             tf.reduce_any(
                 tf.logical_and(
@@ -163,19 +197,20 @@ class ACTDAAnalysisModel(object):
                 # only stop if all of the batch have passed either threshold
 
             # Do while loop iterations until predicate above is false.
-        i,array_probs,premise_attention,hypothesis_attention,_,_,remainders,iterations,_,_,_,state = \
+        i,incremental_states, array_probs,premise_attention,hypothesis_attention,_,_,remainders,iterations,_,_,_,state = \
             tf.while_loop(pred,self.inference_step,
-            [i,array_probs, premise_attention, hypothesis_attention,
+            [i,incremental_states, array_probs, premise_attention, hypothesis_attention,
              batch_mask,prob_compare,prob,
              counter,initial_state,premise, hypothesis, acc_states])
 
         self.ACTPROB = array_probs.pack()
         self.ACTPREMISEATTN = premise_attention.pack()
         self.ACTHYPOTHESISATTN = hypothesis_attention.pack()
+        self.incremental_states = incremental_states.pack()
 
         return state, remainders, iterations
 
-    def inference_step(self, i, array_probs, premise_attention, hypothesis_attention,
+    def inference_step(self, i, incremental_states, array_probs, premise_attention, hypothesis_attention,
         batch_mask, prob_compare,prob,counter, state, premise, hypothesis, acc_states):
 
         if self.config.keep_prob < 1.0 and self.is_training:
@@ -192,6 +227,7 @@ class ACTDAAnalysisModel(object):
 
         input = tf.concat(1, [hyp_gate * hyp_attn, prem_gate * prem_attn])
         output, new_state = self.inference_cell(input,state)
+        incremental_states = incremental_states.write(i, new_state)
 
         with tf.variable_scope('sigmoid_activation_for_pondering'):
             p = tf.squeeze(tf.sigmoid(tf.nn.rnn_cell._linear(new_state, 1, True)))
@@ -236,7 +272,7 @@ class ACTDAAnalysisModel(object):
         premise_attention,acc_state = tf.cond(condition, normal, use_remainder)
         i += 1
 
-        return (i,array_probs, premise_attention, hypothesis_attention,
+        return (i, incremental_states, array_probs, premise_attention, hypothesis_attention,
                 new_batch_mask, prob_compare,prob,counter, new_state,
                 premise, hypothesis, acc_state)
 

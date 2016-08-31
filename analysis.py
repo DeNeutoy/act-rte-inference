@@ -40,11 +40,14 @@ def analysis_epoch(session, models, data, vocab):
         assert x["premise"].shape == (m.premise.get_shape())
         assert x["hypothesis"].shape == (m.hypothesis.get_shape())
 
-        batch_acc, cost, probs, prem, hyp = session.run([m.accuracy, m.cost, m.ACTPROB, m.ACTPREMISEATTN,m.ACTHYPOTHESISATTN], feed_dict={m.premise: x["premise"],
+        batch_acc, cost, probs, prem, hyp, act_step_accs, act_step_dist = session.run([m.accuracy, m.cost, m.ACTPROB, m.ACTPREMISEATTN,m.ACTHYPOTHESISATTN, m.per_step_accs, m.per_step_dists], feed_dict={m.premise: x["premise"],
                                       m.hypothesis: x["hypothesis"],
                                       m.targets: y})
-
+        print(act_step_accs)
+        print(act_step_dist)
         stats = {}
+        stats["per_step_accs"] = act_step_accs
+        stats["per_step_dist"] = act_step_dist.squeeze(1)
         stats["act_probs"] = probs.squeeze(1)
         stats["premise"] = vocab.tokens_for_ids(x["premise"].squeeze().tolist())
         stats["premise_attention"] = prem.squeeze(1)
