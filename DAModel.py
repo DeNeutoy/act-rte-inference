@@ -45,14 +45,20 @@ class DAModel(object):
                 hypothesis_inputs = input_projection3D(hypothesis_inputs, self.hidden_size)
 
         # run FF networks over inputs
-        prem_attn = self.feed_forward_attention(premise_inputs, "premise_attention")
-        hyp_attn = self.feed_forward_attention(hypothesis_inputs, "hypothesis_attention")
+        with tf.variable_scope("FF"):
+            prem_attn = self.feed_forward_attention(premise_inputs)
+        with tf.variable_scope("FF", reuse=True):
+            hyp_attn = self.feed_forward_attention(hypothesis_inputs)
 
+        # This is doing all the dot-products for the feedforward attention at once.
         # get activations, shape: (batch, prem_steps, hyp_steps )
         dot = tf.batch_matmul(prem_attn, hyp_attn, adj_y=True)
 
         hypothesis_softmax = tf.reshape(dot, [batch_size*self.prem_steps, -1,]) #(300,10)
         hypothesis_softmax = tf.expand_dims(tf.nn.softmax(hypothesis_softmax),2)
+
+        dot = tf.transpose(dot, [0,2,1]) # switch dimensions so we don't screw the reshape up
+
         premise_softmax = tf.reshape(dot, [batch_size*self.hyp_steps, -1]) #(200,15)
         premise_softmax = tf.expand_dims(tf.nn.softmax(premise_softmax),2)
 
@@ -63,10 +69,10 @@ class DAModel(object):
         betas = tf.reduce_sum(hypothesis_softmax *
                               tf.tile(hypothesis_inputs, [self.prem_steps, 1 ,1 ]), [1])
 
-        # this is (batch, hyp_steps, hidden dim )
+        # this is a list of (batch, hidden dim) tensors of hyp_steps length
         alphas = [tf.squeeze(x) for x in
                   tf.split(1,self.hyp_steps,tf.reshape(alphas, [batch_size, -1, self.hidden_size]))]
-        # this is (batch, prem_steps, hidden dim)
+        # this is a list of (batch, hidden dim) tensors of prem_steps length
         betas = [tf.squeeze(x) for x in
                  tf.split(1, self.prem_steps,tf.reshape(betas, [batch_size, -1 , self.hidden_size]))]
 
@@ -78,17 +84,20 @@ class DAModel(object):
 
         beta_concat_prems = []
         alpha_concat_hyps = []
+
+        # append the relevant alpha/beta to the original word representation
         for input, rep in zip(prem_list, betas):
             beta_concat_prems.append(tf.concat(1,[input,rep]))
 
         for input, rep in zip(hyp_list, alphas):
             alpha_concat_hyps.append(tf.concat(1, [input, rep]))
 
+
+        # send both through a feedforward network with shared parameters
         with tf.variable_scope("compare"):
             prem_comparison_vecs = tf.split(0,self.prem_steps,
                     self.feedforward_network(tf.concat(0, beta_concat_prems)))
 
-        # seems pretty dubious as to why we use the same network here.
         with tf.variable_scope("compare", reuse=True):
             hyp_comparison_vecs = tf.split(0,self.hyp_steps,
                     self.feedforward_network(tf.concat(0, alpha_concat_hyps)))
@@ -130,29 +139,27 @@ class DAModel(object):
             optimizer = tf.train.AdamOptimizer(self.lr)
             self.train_op = optimizer.apply_gradients(zip(grads, tvars))
 
-    def feed_forward_attention(self, attendees, scope):
+    def feed_forward_attention(self, attendees):
         "Sends 3D tensor through two 2D convolutions with 2 different features"
 
         attn_length = attendees.get_shape()[1].value
         attn_size = attendees.get_shape()[2].value
 
-        with tf.variable_scope(scope):
+        hidden = tf.reshape(attendees, [-1, attn_length, 1, attn_size])
+        k1 = tf.get_variable("W1", [1,1,attn_size,attn_size])
+        k2 = tf.get_variable("W2", [1,1,attn_size,attn_size])
+        b1 = tf.get_variable("b1", [attn_size])
+        b2 = tf.get_variable("b2", [attn_size])
 
-            hidden = tf.reshape(attendees, [-1, attn_length, 1, attn_size])
-            k1 = tf.get_variable("W1", [1,1,attn_size,attn_size])
-            k2 = tf.get_variable("W2", [1,1,attn_size,attn_size])
-            b1 = tf.get_variable("b1", [attn_size])
-            b2 = tf.get_variable("b2", [attn_size])
+        if self.config.keep_prob < 1.0 and self.is_training:
+            hidden = tf.nn.dropout(hidden, self.config.keep_prob)
 
-            if self.config.keep_prob < 1.0 and self.is_training:
-                hidden = tf.nn.dropout(hidden, self.config.keep_prob)
+        features = tf.nn.relu(tf.nn.bias_add(tf.nn.conv2d(hidden, k1, [1, 1, 1, 1], "SAME"),b1))
 
-            features = tf.nn.relu(tf.nn.bias_add(tf.nn.conv2d(hidden, k1, [1, 1, 1, 1], "SAME"),b1))
+        if self.config.keep_prob < 1.0 and self.is_training:
+            features = tf.nn.dropout(features, self.config.keep_prob)
 
-            if self.config.keep_prob < 1.0 and self.is_training:
-                features = tf.nn.dropout(features, self.config.keep_prob)
-
-            features = tf.nn.relu(tf.nn.bias_add(tf.nn.conv2d(features, k2, [1,1,1,1], "SAME"), b2))
+        features = tf.nn.relu(tf.nn.bias_add(tf.nn.conv2d(features, k2, [1,1,1,1], "SAME"), b2))
 
         return tf.squeeze(features)
 
