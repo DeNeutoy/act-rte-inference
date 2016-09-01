@@ -46,14 +46,19 @@ class ACTDAAnalysisModel(object):
                 hypothesis_inputs = input_projection3D(hypothesis_inputs, self.hidden_size)
 
         # run FF networks over inputs
-        prem_attn = self.feed_forward_attention(premise_inputs, "premise_attention")
-        hyp_attn = self.feed_forward_attention(hypothesis_inputs, "hypothesis_attention")
+        with tf.variable_scope("FF"):
+            prem_attn = self.feed_forward_attention(premise_inputs)
+        with tf.variable_scope("FF", reuse=True):
+            hyp_attn = self.feed_forward_attention(hypothesis_inputs)
 
         # get activations, shape: (batch, prem_steps, hyp_steps )
         dot = tf.batch_matmul(prem_attn, hyp_attn, adj_y=True)
 
         hypothesis_softmax = tf.reshape(dot, [batch_size*self.prem_steps, -1,]) #(300,10)
         hypothesis_softmax = tf.expand_dims(tf.nn.softmax(hypothesis_softmax),2)
+
+        dot = tf.transpose(dot, [0,2,1])
+
         premise_softmax = tf.reshape(dot, [batch_size*self.hyp_steps, -1]) #(200,15)
         premise_softmax = tf.expand_dims(tf.nn.softmax(premise_softmax),2)
 
@@ -336,29 +341,28 @@ class ACTDAAnalysisModel(object):
 
         return a ,ds
 
-    def feed_forward_attention(self, attendees, scope):
+    def feed_forward_attention(self, attendees):
         "Sends 3D tensor through two 2D convolutions with 2 different features"
 
         attn_length = attendees.get_shape()[1].value
         attn_size = attendees.get_shape()[2].value
 
-        with tf.variable_scope(scope):
 
-            hidden = tf.reshape(attendees, [-1, attn_length, 1, attn_size])
-            k1 = tf.get_variable("W1", [1,1,attn_size,attn_size])
-            k2 = tf.get_variable("W2", [1,1,attn_size,attn_size])
-            b1 = tf.get_variable("b1", [attn_size])
-            b2 = tf.get_variable("b2", [attn_size])
+        hidden = tf.reshape(attendees, [-1, attn_length, 1, attn_size])
+        k1 = tf.get_variable("W1", [1,1,attn_size,attn_size])
+        k2 = tf.get_variable("W2", [1,1,attn_size,attn_size])
+        b1 = tf.get_variable("b1", [attn_size])
+        b2 = tf.get_variable("b2", [attn_size])
 
-            if self.config.keep_prob < 1.0 and self.is_training:
-                hidden = tf.nn.dropout(hidden, self.config.keep_prob)
+        if self.config.keep_prob < 1.0 and self.is_training:
+            hidden = tf.nn.dropout(hidden, self.config.keep_prob)
 
-            features = tf.nn.relu(tf.nn.bias_add(tf.nn.conv2d(hidden, k1, [1, 1, 1, 1], "SAME"),b1))
+        features = tf.nn.relu(tf.nn.bias_add(tf.nn.conv2d(hidden, k1, [1, 1, 1, 1], "SAME"),b1))
 
-            if self.config.keep_prob < 1.0 and self.is_training:
-                features = tf.nn.dropout(features, self.config.keep_prob)
+        if self.config.keep_prob < 1.0 and self.is_training:
+            features = tf.nn.dropout(features, self.config.keep_prob)
 
-            features = tf.nn.relu(tf.nn.bias_add(tf.nn.conv2d(features, k2, [1,1,1,1], "SAME"), b2))
+        features = tf.nn.relu(tf.nn.bias_add(tf.nn.conv2d(features, k2, [1,1,1,1], "SAME"), b2))
 
         return tf.squeeze(features)
 
