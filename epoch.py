@@ -105,5 +105,37 @@ def extra_epoch(session, models, data, training, verbose=False):
     variance = var_steps/(iters*m.batch_size) - np.square(avg_steps/(iters*m.batch_size))
     return (costs / iters), (accuracy / iters), (avg_steps/(iters*m.batch_size)), variance
 
+def async_single_epoch(num_threads, session, models, data, verbose=False):
 
+    def single_thread_epoch(coordinator, session):
+
+        epoch_size, id_to_data = bucket_shuffle(data)
+
+        step = 0.0
+        start_time = time.time()
+        accuracy = 0.0
+        while not coordinator.should_stop():
+            try:
+                (id,(x, y)) = next(id_to_data)
+                m = models[id]
+                step +=1
+
+                acc, _ = session.run([m.accuracy, m.train_op], feed_dict={m.premise: x["premise"],
+                                      m.hypothesis: x["hypothesis"],
+                                      m.targets: y})
+                accuracy += acc
+                print("{} acc: {} speed: {} examples/s".format(step * 1.0 / epoch_size,
+                              accuracy / step,
+                              step * m.batch_size / (time.time() - start_time)))
+            except:
+                print("Requesting stop")
+                coordinator.request_stop()
+
+    coord = tf.train.Coordinator()
+    threads = [threading.Thread(target=single_thread_epoch, args=(coord,session)) for x in range(num_threads)]
+
+    # Start the threads and wait for all of them to stop.
+    print("Starting {} optimisation threads".format(num_threads))
+    for t in threads: t.start()
+    coord.join(threads)
 

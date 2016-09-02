@@ -8,7 +8,7 @@ from datetime import datetime
 import config as CONFIG
 import snli_reader
 import tensorflow as tf
-from epoch import run_epoch
+from epoch import run_epoch, async_single_epoch
 from Vocab import Vocab
 from IAAModel import IAAModel
 from DAModel import DAModel
@@ -44,6 +44,7 @@ def main(unused_args):
     verbose = args.verbose
     debug = args.debug
     embeddings = args.embedding_path
+    multi_thread = args.multi_thread
 
     MODEL, config = get_config_and_model(args.model)
     _, eval_config = get_config_and_model(args.model)
@@ -85,7 +86,7 @@ def main(unused_args):
     if debug:
         buckets = [(15,10)]
         raw_data = snli_reader.load_data(args.data_path,train, val, test, vocab, False,
-                            max_records=50,buckets=buckets, batch_size=config.batch_size)
+                            max_records=100,buckets=buckets, batch_size=config.batch_size)
     else:
         buckets = [(10,5),(20,10),(30,20),(40,30),(50,40),(82,62)]
         raw_data = snli_reader.load_data(args.data_path,train, val, test, vocab, False,
@@ -177,7 +178,15 @@ def main(unused_args):
                 #lr_decay = config.lr_decay ** max(i - config.max_epoch, 0.0)
                 #session.run(tf.assign(m[model].lr, config.learning_rate * lr_decay))
                 print("Epoch {}, Training data".format(i + 1))
-                train_loss, train_acc = run_epoch(session, models, train_buckets,training=True, verbose=True)
+
+                if multi_thread:
+
+                    train_acc = "N/A"
+                    train_loss = "N/A"
+                    async_single_epoch(multi_thread, session, models, train_buckets)
+                else:
+                    train_loss, train_acc = run_epoch(session, models, train_buckets,training=True, verbose=True)
+
                 print ("Epoch {}, Validation data".format(i + 1))
                 valid_loss, valid_acc = run_epoch(session, models_val, val_buckets,training=False)
 
@@ -244,6 +253,7 @@ if __name__ == '__main__':
     parser.add_argument("--weights_dir")
     parser.add_argument("--verbose")
     parser.add_argument("--debug", action='store_true', default=False)
+    parser.add_argument("--multi_thread", type=int)
     parser.add_argument("--grid_search", action='store_true', default=False)
     parser.add_argument("--vocab_path")
     parser.add_argument("--embedding_path")
