@@ -7,9 +7,9 @@ This code uses one of the daily binary tensorflow releases, which you can downlo
 
 This code implements a couple of papers:
 
-[Alternating Iterative Neural Attention for Machine Reading](http://arxiv.org/abs/1606.02245)
-[A Decomposable Attention model for Natural Language Inference](https://arxiv.org/abs/1606.01933)
-[Adaptive Computation Time for Recurrent Neural Networks](http://arxiv.org/abs/1603.08983)
+1. [Alternating Iterative Neural Attention for Machine Reading](http://arxiv.org/abs/1606.02245)
+2. [A Decomposable Attention model for Natural Language Inference](https://arxiv.org/abs/1606.01933)
+3. [Adaptive Computation Time for Recurrent Neural Networks](http://arxiv.org/abs/1603.08983)
 
 These are then combined to make a couple of different models for Adaptive Natural Language Inference.
 
